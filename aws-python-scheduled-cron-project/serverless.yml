@@ -1,0 +1,113 @@
+org: kshitijkumar123
+app: aws-python
+service: aws-python-scheduled-cron-project
+frameworkVersion: '3'
+
+custom:
+  tableName: "watch-me-users-table-${sls:stage}"
+  region: ${self:provider.region}
+
+provider:
+  name: aws
+  runtime: python3.8
+  region: us-east-1
+  stage: dev
+  iam:
+    role:
+      statements:
+      # S3 role: Currently, this allows all access to all s3 buckets
+        - Effect: Allow
+          Action: 's3:*'
+          Resource: '*'
+      # DynamoDB role
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - Fn::GetAtt: [UsersTable, Arn]
+  environment:
+    USERS_TABLE: ${self:custom.tableName}
+    REGION: ${self:provider.region}
+functions:
+  cronHandler:
+    handler: handler.run
+    events:
+      # Invoke Lambda function every 1pm from Mon-Fri
+      - schedule: cron(00 13 ? * MON-FRI *)
+  quotes:
+    handler: handler.get_quotes
+    events:
+      - http:
+          path: quotes
+          method: get
+          cors: true
+  subscribe:
+    handler: handler.subscribe_user
+    events:
+      - http:
+          path: subscribeUser
+          method: post
+          cors: true
+  staticMailer:
+    handler: handler.static_mailer
+    events:
+      - http:
+          path: staticMailer
+          method: post
+          cors: true
+  sendEmail:
+    handler: handler.send_email
+    events:
+      - http:
+          path: sendEmail
+          method: post
+          cors: true
+          # Send email to subs daily at 1pm UTC or 9am EST
+      # - schedule: cron(0 13 * * ? *)
+  getSubscribers:
+    handler: handler.get_subscribers
+    events:
+      - http:
+          path: getSubscribers
+          method: get
+          cors: true
+    
+resources:
+  Resources:
+    PostsMessage:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: watch-me-posts-${self:provider.stage}
+    PostsSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn: !Ref PostsMessage
+        Protocol: email
+        Endpoint: kshitijkumar.atom@gmail.com
+        DeliveryPolicy:
+          healthyRetryPolicy:
+            numRetries: 20
+            minDelayTarget: 30
+            maxDelayTarget: 600
+            backoffFunction: exponential
+    S3Assets:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: user-posts-dev-assets
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.tableName}
+    
