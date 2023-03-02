@@ -40,10 +40,10 @@ functions:
       # Invoke Lambda function every 1pm from Mon-Fri
       - schedule: cron(00 13 ? * MON-FRI *)
   quotes:
-    handler: handler.get_quotes
+    handler: handler.get_posts
     events:
       - http:
-          path: quotes
+          path: posts
           method: get
           cors: true
   subscribe:

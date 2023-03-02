@@ -11,16 +11,30 @@ s3 = boto3.resource("s3")
 # Format response in JSON
 
 
-def return_resp(body, status_code=200):
+def return_resp(body, status_code=200, content_type="application/json"):
     """Returns JSON response from Lambda."""
-    response = {
+    return {
         "statusCode": status_code,
-        "Content-Type": "application/json",
-        "body": json.dumps({
-            body
-        })
+        "Content-Type": content_type,
+        "body": body
     }
-    return response
+
+
+def get_file_contents(bucket):
+    s3 = boto3.resource('s3')
+    selected_bucket = s3.Bucket(bucket)
+
+    file_contents = []
+
+    for obj in selected_bucket.objects.all():
+        body = obj.get()['Body'].read()
+        filename = obj.key.split('/')[-1]
+        content = {
+            filename: body
+        }
+        file_contents.append(content)
+
+    return file_contents
 
 
 def run(event, context):
@@ -34,11 +48,17 @@ def run(event, context):
     print("Your cron function " + name + " ran at " + str(current_time))
     logger.info("Your cron function " + name + " ran at " + str(current_time))
 
+# TODO: fix. This should be get posts not quotes...
 
-def get_quotes(event, context):
-    post = "get quotes"
 
-    return return_resp(body={"post": post})
+def get_posts(event, context):
+    user_posts = get_file_contents('user-posts-dev-assets')
+    body = {
+        "posts": user_posts
+    }
+
+    print(body)
+    return return_resp(body=body, content_type="text/html")
 
 
 def subscribe_user(event, context):
@@ -63,3 +83,6 @@ def get_subscribers(event, context):
     post = "get subscribers"
 
     return return_resp(body={"post": post})
+
+# Testing...
+# print(get_posts('', ''))
