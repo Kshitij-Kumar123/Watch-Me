@@ -14,7 +14,7 @@ s3 = boto3.resource("s3")
 # Format response in JSON
 
 
-def return_resp(body, status_code=200, content_type="application/json"):
+def build_resp(body, status_code=200, content_type="application/json"):
     """Returns JSON response from Lambda."""
 
     return {
@@ -26,6 +26,21 @@ def return_resp(body, status_code=200, content_type="application/json"):
         'body': json.dumps(body),
         "isBase64Encoded": False
     }
+
+
+def pre_sign_up(event, context):
+
+    db_client = boto3.resource('dynamodb')
+    table = db_client.Table('watch-me-users-table-dev')
+
+    print("user information available from cognito: ",
+          event.request.userAttributes)
+
+    response = table.put_item(
+        Item={
+            'userId': event.request.userAttributes.email,
+        }
+    )
 
 
 def get_file_contents(bucket):
@@ -64,7 +79,8 @@ def get_posts(event, context):
     }
 
     print(body)
-    return return_resp(body=body, content_type="text/html")
+    return build_resp(body=body, content_type="text/html")
+
 
 def fetch_quotes_from_s3():
     s3 = boto3.resource('s3')
@@ -74,19 +90,20 @@ def fetch_quotes_from_s3():
 
     return json_content
 
+
 def get_quotes(event, context):
     json_content = fetch_quotes_from_s3()
     quotes_max_index = len(json_content["quotes"]) - 1
     selected_quote_index = random.randint(0, quotes_max_index)
     selected_quote = json_content["quotes"][selected_quote_index]
 
-    return return_resp(body=selected_quote)
+    return build_resp(body=selected_quote)
 
 
 def subscribe_user(event, context):
     post = "subscribe user"
 
-    return return_resp(body={"post": post})
+    return build_resp(body={"post": post})
 
 
 def create_email(quote):
@@ -193,21 +210,21 @@ def send_email(event, context):
 
     except ClientError as e:
         print(e.response['Error']['Message'])
-        return return_resp(body={"message": e.response['Error']['Message']}, status_code=500)
+        return build_resp(body={"message": e.response['Error']['Message']}, status_code=500)
 
     else:
         print("Email sent! Message ID:"),
         print(response['MessageId'])
-        return return_resp(body={"message": f"Message successfully sent. {response['MessageId']}"})
+        return build_resp(body={"message": f"Message successfully sent. {response['MessageId']}"})
+
 
 def static_mailer(event, context):
     post = "static_mailer"
 
-    return return_resp(body={"post": post})
+    return build_resp(body={"post": post})
 
 
 def get_subscribers(event, context):
     post = "get subscribers"
 
-    return return_resp(body={"post": post})
-
+    return build_resp(body={"post": post})

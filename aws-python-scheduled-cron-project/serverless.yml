@@ -89,6 +89,13 @@ functions:
           path: getSubscribers
           method: get
           cors: true
+
+  preSignUp:
+    handler: handler.pre_sign_up
+    events:
+      - cognitoUserPool:
+          pool: MyUserPool
+          trigger: PreSignUp
     
 resources:
   Resources:
