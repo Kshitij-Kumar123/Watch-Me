@@ -124,3 +124,26 @@ resources:
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:custom.tableName}
     
+    # AWS Cognito (do not deploy)
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:provider.stage}-user-pool
+        # email creds. for login
+        UsernameAttributes:
+          - email
+        AutoVerifiedAttributes:
+          - email
+    # Client for web app access to Cognito
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: ${self:provider.stage}-user-pool-client
+        UserPoolId:
+          Ref: CognitoUserPool
+        ExplicitAuthFlows:
+        # What?
+          - ADMIN_NO_SRP_AUTH 
+        # Why not generate automatic secrets?
+        GenerateSecret: False 
+        

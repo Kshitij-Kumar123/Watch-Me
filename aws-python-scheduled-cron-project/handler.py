@@ -75,14 +75,9 @@ def fetch_quotes_from_s3():
     return json_content
 
 def get_quotes(event, context):
-    s3 = boto3.resource('s3')
-    quotes_file = s3.Object('quotesbucketinspiration', 'quotes.json')
-    file_content = quotes_file.get()['Body'].read().decode('utf-8')
-    json_content = json.loads(file_content)
-
-    selected_quote = json_content
-    file_len = len(json_content["quotes"]) - 1
-    selected_quote_index = random.randint(0, file_len)
+    json_content = fetch_quotes_from_s3()
+    quotes_max_index = len(json_content["quotes"]) - 1
+    selected_quote_index = random.randint(0, quotes_max_index)
     selected_quote = json_content["quotes"][selected_quote_index]
 
     return return_resp(body=selected_quote)
@@ -194,11 +189,8 @@ def send_email(event, context):
                 },
             },
             Source=SENDER,
-            # If you are not using a configuration set, comment or delete the
-            # following line
-            # ConfigurationSetName=CONFIGURATION_SET,
         )
-    # Display an error if something goes wrong.
+
     except ClientError as e:
         print(e.response['Error']['Message'])
         return return_resp(body={"message": e.response['Error']['Message']}, status_code=500)
