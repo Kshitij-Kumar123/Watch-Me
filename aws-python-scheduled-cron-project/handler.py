@@ -12,8 +12,6 @@ logger.setLevel(logging.INFO)
 s3 = boto3.resource("s3")
 
 # Format response in JSON
-
-
 def build_resp(body, status_code=200, content_type="application/json"):
     """Returns JSON response from Lambda."""
 
@@ -27,20 +25,24 @@ def build_resp(body, status_code=200, content_type="application/json"):
         "isBase64Encoded": False
     }
 
-
+# Rename functions
 def pre_sign_up(event, context):
 
     db_client = boto3.resource('dynamodb')
     table = db_client.Table('watch-me-users-table-dev')
 
-    print("user information available from cognito: ",
-          event.request.userAttributes)
+    new_user_id = event["request"]["userAttributes"]["email"]
 
     response = table.put_item(
         Item={
-            'userId': event.request.userAttributes.email,
+            'userId': new_user_id,
+            "subscribeStatus": "false"
         }
     )
+
+    # TODO: Send email for confirmation and greeting
+
+    return event
 
 
 def get_file_contents(bucket):
@@ -59,7 +61,7 @@ def get_file_contents(bucket):
 
     return file_contents
 
-
+# Remove handlers which are not needed
 def run(event, context):
     print("making a change")
     current_time = datetime.datetime.now().time()
@@ -99,7 +101,7 @@ def get_quotes(event, context):
 
     return build_resp(body=selected_quote)
 
-
+# TODO
 def subscribe_user(event, context):
     post = "subscribe user"
 
@@ -223,7 +225,7 @@ def static_mailer(event, context):
 
     return build_resp(body={"post": post})
 
-
+# TODO
 def get_subscribers(event, context):
     post = "get subscribers"
 

@@ -94,8 +94,10 @@ functions:
     handler: handler.pre_sign_up
     events:
       - cognitoUserPool:
-          pool: MyUserPool
-          trigger: PreSignUp
+          pool: amplifyreactapp6a4fef01_userpool_6a4fef01-dev
+          trigger: PostConfirmation
+          existing: true
+          forceDeploy: true
     
 resources:
   Resources:
