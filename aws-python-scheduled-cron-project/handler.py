@@ -4,6 +4,7 @@ import logging
 import boto3
 import random
 import os
+import uuid
 from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
@@ -12,6 +13,8 @@ logger.setLevel(logging.INFO)
 s3 = boto3.resource("s3")
 
 # Format response in JSON
+
+
 def build_resp(body, status_code=200, content_type="application/json"):
     """Returns JSON response from Lambda."""
 
@@ -26,6 +29,8 @@ def build_resp(body, status_code=200, content_type="application/json"):
     }
 
 # Rename functions
+
+
 def pre_sign_up(event, context):
 
     db_client = boto3.resource('dynamodb')
@@ -36,7 +41,7 @@ def pre_sign_up(event, context):
     response = table.put_item(
         Item={
             'userId': new_user_id,
-            "subscribeStatus": "false"
+            "subscribeStatus": False
         }
     )
 
@@ -61,28 +66,6 @@ def get_file_contents(bucket):
 
     return file_contents
 
-# Remove handlers which are not needed
-def run(event, context):
-    print("making a change")
-    current_time = datetime.datetime.now().time()
-    name = context.function_name
-    for bucket in s3.buckets.all():
-        logger.info(bucket.name)
-        print(bucket.name)
-
-    print("Your cron function " + name + " ran at " + str(current_time))
-    logger.info("Your cron function " + name + " ran at " + str(current_time))
-
-
-def get_posts(event, context):
-    user_posts = get_file_contents('user-posts-dev-assets')
-    body = {
-        "posts": user_posts
-    }
-
-    print(body)
-    return build_resp(body=body, content_type="text/html")
-
 
 def fetch_quotes_from_s3():
     s3 = boto3.resource('s3')
@@ -100,12 +83,6 @@ def get_quotes(event, context):
     selected_quote = json_content["quotes"][selected_quote_index]
 
     return build_resp(body=selected_quote)
-
-# TODO
-def subscribe_user(event, context):
-    post = "subscribe user"
-
-    return build_resp(body={"post": post})
 
 
 def create_email(quote):
@@ -220,12 +197,85 @@ def send_email(event, context):
         return build_resp(body={"message": f"Message successfully sent. {response['MessageId']}"})
 
 
-def static_mailer(event, context):
-    post = "static_mailer"
+# TODO
+# CRUD with incidents --
+# Add authorization and endpoint restriction for such incidents --
+# Send emails to users to info they are subscribed to: insight emails about ticket with quote
+
+# TODO: Incidents CRUD
+def get_incidents(event, context):
+    # Get all subscribers of the incident by pkey (id) and/or skey (active)
+    incidents_table = str(os.environ['INCIDENTS_TABLE'])
+    db_client = boto3.resource('dynamodb')
+    table = db_client.Table(incidents_table)
+
+    response = table.get_item(Key={
+        'incidentId': event['pathParameters']['id']
+    })
+
+    item = response['Item']
+
+    return build_resp(body=item)
+
+
+def create_incidents(event, context):
+    incidents_table = str(os.environ['INCIDENTS_TABLE'])
+    db_client = boto3.resource('dynamodb')
+    table = db_client.Table(incidents_table)
+    itemId = str(uuid.uuid4())
+    response = table.put_item(
+        Item={
+            "incidentId": itemId,
+            "reporter": "example"
+        }
+    )
+
+    item = {
+        "incidentId": itemId,
+        "reporter": "example"
+    }
+    return build_resp(body=item)
+
+
+def update_incidents(event, context):
+    incidents_table = str(os.environ['INCIDENTS_TABLE'])
+    db_client = boto3.resource('dynamodb')
+    table = db_client.Table(incidents_table)
+
+    table.update_item(
+        Key={'incidentsId': event['pathParameters']['id']},
+        AttributeUpdates={
+            'status': 'complete',
+        },
+    )
+
+    response = table.get_item(Key={
+        'incidentId': event['pathParameters']['id']
+    })
+
+    item = response['Item']
+
+    return build_resp(body=item)
+
+
+def delete_incidents(event, context):
+    incidents_table = str(os.environ['INCIDENTS_TABLE'])
+    db_client = boto3.resource('dynamodb')
+    table = db_client.Table(incidents_table)
+
+    response = table.delete_item(Key={
+        'incidentId': event['pathParameters']['id']
+    })
+
+    return build_resp(body={"message": "Incident with ID deleted: " + event['pathParameters']['id']})
+
+
+def subscribe_user(event, context):
+    post = "subscribe user"
 
     return build_resp(body={"post": post})
 
-# TODO
+
 def get_subscribers(event, context):
     post = "get subscribers"
 

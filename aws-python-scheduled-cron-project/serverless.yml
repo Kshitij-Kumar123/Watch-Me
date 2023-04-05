@@ -1,10 +1,18 @@
 org: kshitijkumar123
 app: aws-python
-service: aws-python-scheduled-cron-project
-frameworkVersion: '3'
+service: aws-serverless-python-project
+frameworkVersion: "3"
+
+# TODO:
+# Add authorization and endpoint restriction
+# Send emails to users to info they are subscribed to
+# add basic ticket management
+# - just one organization with employees
+# insight emails about ticket with quote
 
 custom:
   tableName: "watch-me-users-table-${sls:stage}"
+  incidentsTableName: "incidents-table-${sls:stage}"
   region: ${self:provider.region}
 
 provider:
@@ -12,14 +20,15 @@ provider:
   runtime: python3.8
   region: us-east-1
   stage: dev
+
   iam:
     role:
       statements:
-      # S3 role: Currently, this allows all access to all s3 buckets
+        # S3 role: Currently, this allows all access to all s3 buckets
         - Effect: Allow
-          Action: 's3:*'
-          Resource: '*'
-      # DynamoDB role
+          Action: "s3:*"
+          Resource: "*"
+        # DynamoDB role
         - Effect: Allow
           Action:
             - dynamodb:Query
@@ -30,6 +39,7 @@ provider:
             - dynamodb:DeleteItem
           Resource:
             - Fn::GetAtt: [UsersTable, Arn]
+            - Fn::GetAtt: [IncidentsTable, Arn]
         - Effect: Allow
           Action:
             - "ses:SendEmail"
@@ -37,19 +47,9 @@ provider:
   environment:
     USERS_TABLE: ${self:custom.tableName}
     REGION: ${self:provider.region}
+    INCIDENTS_TABLE: "incidents-table-${sls:stage}"
+
 functions:
-  cronHandler:
-    handler: handler.run
-    events:
-      # Invoke Lambda function every 1pm from Mon-Fri
-      - schedule: cron(00 13 ? * MON-FRI *)
-  posts:
-    handler: handler.get_posts
-    events:
-      - http:
-          path: posts
-          method: get
-          cors: true
   quotes:
     handler: handler.get_quotes
     events:
@@ -64,15 +64,6 @@ functions:
           path: subscribeUser
           method: post
           cors: true
-  staticMailer:
-    handler: handler.static_mailer
-    events:
-      - http:
-          path: staticMailer
-          method: post
-          cors: true
-      - schedule: cron(00 13 ? * MON-FRI *)
-
   sendEmail:
     handler: handler.send_email
     events:
@@ -89,7 +80,6 @@ functions:
           path: getSubscribers
           method: get
           cors: true
-
   preSignUp:
     handler: handler.pre_sign_up
     events:
@@ -98,9 +88,43 @@ functions:
           trigger: PostConfirmation
           existing: true
           forceDeploy: true
-    
+
+  # Incidents CRUD
+  getIncidents:
+    handler: handler.get_incidents
+    events:
+      - http:
+          path: incident/{id}
+          method: get
+          cors: true
+  
+  createIncidents:
+    handler: handler.create_incidents
+    events:
+      - http:
+          path: incident
+          method: post
+          cors: true
+
+  updateIncidents:
+    handler: handler.update_incidents
+    events:
+      - http:
+          path: incident/{id}
+          method: patch
+          cors: true
+
+  deleteIncidents:
+    handler: handler.delete_incidents
+    events:
+      - http:
+          path: incident/{id}
+          method: delete
+          cors: true
+
 resources:
   Resources:
+  # TODO: check if needed
     PostsMessage:
       Type: AWS::SNS::Topic
       Properties:
@@ -117,10 +141,10 @@ resources:
             minDelayTarget: 30
             maxDelayTarget: 600
             backoffFunction: exponential
-    S3Assets:
-      Type: AWS::S3::Bucket
-      Properties:
-        BucketName: user-posts-dev-assets
+    # S3Assets:
+    #   Type: AWS::S3::Bucket
+    #   Properties:
+    #     BucketName: user-posts-dev-assets
     UsersTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -132,8 +156,20 @@ resources:
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:custom.tableName}
-    
-    # AWS Cognito (do not deploy)
+
+    IncidentsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: incidentId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: incidentId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.incidentsTableName}
+
+    # AWS Cognito
     CognitoUserPool:
       Type: AWS::Cognito::UserPool
       Properties:
@@ -151,8 +187,5 @@ resources:
         UserPoolId:
           Ref: CognitoUserPool
         ExplicitAuthFlows:
-        # What?
-          - ADMIN_NO_SRP_AUTH 
-        # Why not generate automatic secrets?
-        GenerateSecret: False 
-        
+          - ADMIN_NO_SRP_AUTH
+        GenerateSecret: False
