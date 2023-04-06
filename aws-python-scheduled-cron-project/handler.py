@@ -198,7 +198,7 @@ def send_email(event, context):
 
 
 # TODO
-# CRUD with incidents --
+# CRUD with incidents -- done
 # Add authorization and endpoint restriction for such incidents --
 # Send emails to users to info they are subscribed to: insight emails about ticket with quote
 
@@ -208,66 +208,106 @@ def get_incidents(event, context):
     incidents_table = str(os.environ['INCIDENTS_TABLE'])
     db_client = boto3.resource('dynamodb')
     table = db_client.Table(incidents_table)
+    incident_id = event['pathParameters']['id']
 
-    response = table.get_item(Key={
-        'incidentId': event['pathParameters']['id']
-    })
+    try:
+        response = table.get_item(Key={
+            'incidentId': event['pathParameters']['id']
+        })
 
-    item = response['Item']
-
-    return build_resp(body=item)
+    except ClientError as err:
+        logger.error(
+            "Couldn't get incident %s. Here's why: %s: %s",
+            incident_id,
+            err.response['Error']['Code'], err.response['Error']['Message'])
+        return build_resp(body=err.response['Error'])
+    else:
+        item = response['Item']
+        return build_resp(body=item)
 
 
 def create_incidents(event, context):
     incidents_table = str(os.environ['INCIDENTS_TABLE'])
     db_client = boto3.resource('dynamodb')
     table = db_client.Table(incidents_table)
-    itemId = str(uuid.uuid4())
-    response = table.put_item(
-        Item={
-            "incidentId": itemId,
-            "reporter": "example"
-        }
-    )
+    incident_id = str(uuid.uuid4())
 
-    item = {
-        "incidentId": itemId,
-        "reporter": "example"
-    }
-    return build_resp(body=item)
+    try:
+        response = table.put_item(
+            Item={
+                "incidentId": incident_id,
+                "reporter": "example"
+            }
+        )
+    except ClientError as err:
+        logger.error(
+            "Couldn't create incident. Here's why: %s: %s",
+            err.response['Error']['Code'], err.response['Error']['Message'])
+        raise
+    else:
+        return build_resp(body={
+            "incidentId": incident_id,
+            "reporter": "example"
+        })
 
 
 def update_incidents(event, context):
     incidents_table = str(os.environ['INCIDENTS_TABLE'])
     db_client = boto3.resource('dynamodb')
     table = db_client.Table(incidents_table)
+    incident_id = event['pathParameters']['id']
 
-    table.update_item(
-        Key={'incidentsId': event['pathParameters']['id']},
-        AttributeUpdates={
-            'status': 'complete',
-        },
-    )
+    try:
+        response = table.update_item(
+            Key={'incidentId': incident_id},
+            UpdateExpression="set info.incidentStatus=:s",
+            ExpressionAttributeValues={
+                ":s": "complete"
+            },
+            ReturnValues="UPDATED_NEW"
+        )
+    except ClientError as err:
+        if err.response['Error']['Code'] == 'ValidationException':
+            response = table.update_item(
+                Key={'incidentId': incident_id},
+                UpdateExpression="set incidentStatus = :incidentStatus",
+                ExpressionAttributeValues={
+                    ':incidentStatus': {
+                        ':c': "complete"
+                    }
+                },
+                ReturnValues="UPDATED_NEW"
+            )
 
-    response = table.get_item(Key={
-        'incidentId': event['pathParameters']['id']
-    })
+            return build_resp(body=response['Attributes'])
 
-    item = response['Item']
-
-    return build_resp(body=item)
+        logger.error(
+            "Couldn't update incident %s. Here's why: %s: %s",
+            incident_id,
+            err.response['Error']['Code'], err.response['Error']['Message'])
+        raise
+    else:
+        return build_resp(body=response['Attributes'])
 
 
 def delete_incidents(event, context):
     incidents_table = str(os.environ['INCIDENTS_TABLE'])
     db_client = boto3.resource('dynamodb')
     table = db_client.Table(incidents_table)
+    incident_id = event['pathParameters']['id']
 
-    response = table.delete_item(Key={
-        'incidentId': event['pathParameters']['id']
-    })
-
-    return build_resp(body={"message": "Incident with ID deleted: " + event['pathParameters']['id']})
+    try:
+        response = table.delete_item(Key={
+            'incidentId': event['pathParameters']['id']
+        })
+    except ClientError as err:
+        logger.error(
+            "Couldn't delete incident %s. Here's why: %s: %s",
+            incident_id,
+            err.response['Error']['Code'], err.response['Error']['Message'])
+        raise
+    else:
+        return build_resp(body={"message": f"Incident deleted with ID: {incident_id}"})
 
 
 def subscribe_user(event, context):
