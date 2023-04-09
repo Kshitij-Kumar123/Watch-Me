@@ -50,6 +50,8 @@ provider:
     INCIDENTS_TABLE: "incidents-table-${sls:stage}"
 
 functions:
+  authorization:
+    handler: handler.authorization
   quotes:
     handler: handler.get_quotes
     events:
@@ -64,6 +66,13 @@ functions:
           path: subscribeUser
           method: post
           cors: true
+  updatePermissions:
+    handler: handler.update_acl
+    events:
+      - http:
+          path: updatePermissions
+          method: post
+          cors: true
   sendEmail:
     handler: handler.send_email
     events:
@@ -71,7 +80,7 @@ functions:
           path: sendEmail
           method: post
           cors: true
-          # Send email to subs daily at 1pm UTC or 9am EST
+          authorizer: authorization
       - schedule: cron(0 13 * * ? *)
   getSubscribers:
     handler: handler.get_subscribers
@@ -80,6 +89,7 @@ functions:
           path: getSubscribers
           method: get
           cors: true
+          authorizer: authorization
   preSignUp:
     handler: handler.pre_sign_up
     events:
@@ -97,7 +107,8 @@ functions:
           path: incident/{id}
           method: get
           cors: true
-  
+          authorizer: authorization
+
   createIncidents:
     handler: handler.create_incidents
     events:
@@ -105,6 +116,7 @@ functions:
           path: incident
           method: post
           cors: true
+          authorizer: authorization
 
   updateIncidents:
     handler: handler.update_incidents
@@ -113,6 +125,7 @@ functions:
           path: incident/{id}
           method: patch
           cors: true
+          # authorizer: handler.authorization
 
   deleteIncidents:
     handler: handler.delete_incidents
@@ -121,10 +134,21 @@ functions:
           path: incident/{id}
           method: delete
           cors: true
+          # authorizer: handler.authorization
 
 resources:
   Resources:
-  # TODO: check if needed
+    Unauthorized:
+      Type: AWS::ApiGateway::GatewayResponse
+      Properties:
+        ResponseParameters:
+          "gatewayresponse.header.Access-Control-Allow-Origin": "'*'"
+          "gatewayresponse.header.Access-Control-Allow-Headers": "'*'"
+        ResponseType: "DEFAULT_4XX"
+        RestApiId:
+          Ref: "ApiGatewayRestApi"
+
+    # TODO: check if needed
     PostsMessage:
       Type: AWS::SNS::Topic
       Properties:
