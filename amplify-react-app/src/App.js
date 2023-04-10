@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Authenticator } from "@aws-amplify/ui-react";
 import "@aws-amplify/ui-react/styles.css";
 import awsExports from "./aws-exports";
-import { fetchQuote } from "./ApiCalls";
+import { fetchQuote, fetchAuthSession,fetchIncident } from "./ApiCalls";
 Amplify.configure(awsExports);
 
 export default function App() {
@@ -11,6 +11,10 @@ export default function App() {
 
   useEffect(() => {
     // fetchQuote().then((value) => setQuote(value));
+    // fetchQuote().then((value) => console.log("quote: ", value));
+    fetchIncident().then((value) => console.log("IncidfetchIncident: ", value));
+    // fetchAuthSession().then((data) => console.log(data));
+
   }, []);
 
   return (

@@ -50,8 +50,6 @@ provider:
     INCIDENTS_TABLE: "incidents-table-${sls:stage}"
 
 functions:
-  authorization:
-    handler: handler.authorization
   quotes:
     handler: handler.get_quotes
     events:
@@ -79,8 +77,9 @@ functions:
       - http:
           path: sendEmail
           method: post
+          authorizer:
+            name: customAuthorizer
           cors: true
-          authorizer: authorization
       - schedule: cron(0 13 * * ? *)
   getSubscribers:
     handler: handler.get_subscribers
@@ -88,8 +87,9 @@ functions:
       - http:
           path: getSubscribers
           method: get
+          authorizer:
+            name: customAuthorizer
           cors: true
-          authorizer: authorization
   preSignUp:
     handler: handler.pre_sign_up
     events:
@@ -106,8 +106,9 @@ functions:
       - http:
           path: incident/{id}
           method: get
+          authorizer:
+            name: customAuthorizer
           cors: true
-          authorizer: authorization
 
   createIncidents:
     handler: handler.create_incidents
@@ -115,8 +116,9 @@ functions:
       - http:
           path: incident
           method: post
+          authorizer:
+            name: customAuthorizer
           cors: true
-          authorizer: authorization
 
   updateIncidents:
     handler: handler.update_incidents
@@ -135,7 +137,8 @@ functions:
           method: delete
           cors: true
           # authorizer: handler.authorization
-
+  customAuthorizer:
+    handler: handler.authorization
 resources:
   Resources:
     Unauthorized:

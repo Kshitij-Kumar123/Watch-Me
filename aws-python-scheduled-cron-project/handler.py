@@ -67,7 +67,7 @@ def update_acl(event, context):
 
         client = boto3.client('dynamodb')
         response = record['dynamodb']['NewImage']
-        table = boto3.resource('dynamodb').Table(os.environ.get('tableName'))
+        table = boto3.resource('dynamodb').Table('watch-me-users-table-dev')
         response = table.update_item(
             # Update acl table
             Key={
@@ -111,12 +111,13 @@ def fetch_quotes_from_s3():
 
 
 def get_quotes(event, context):
+    print(event)
     json_content = fetch_quotes_from_s3()
     quotes_max_index = len(json_content["quotes"]) - 1
     selected_quote_index = random.randint(0, quotes_max_index)
     selected_quote = json_content["quotes"][selected_quote_index]
 
-    return build_resp(body=selected_quote)
+    return build_resp(body={"quote": selected_quote, "event": event})
 
 
 def create_email(quote):
@@ -359,31 +360,35 @@ def get_subscribers(event, context):
 # Authorization handlers
 
 def authorization(event, context):
-
+    logger.info(event)
     print(event)
     token = event['authorizationToken']
     client = boto3.client('cognito-idp')
     response = client.get_user(AccessToken=token)
-
-    # get user uuid
+    print("user response: ", response)
+    # get user email for now --- TODO: will do uuid later
     principalId = response['UserAttributes'][0]['Value']
+    emailId = response['UserAttributes'][2]['Value']
 
     awsAccountId = event['methodArn'].split(':')[4]
     # Configure your policy: restApiId, region, stage, etc.
     policy = AuthPolicy(principalId, awsAccountId)
 
     # Get rules from auth table
-    client = boto3.client('dynamodb')
-    response = client.get_item(
-        TableName=os.environ.get('tableName'),
-        Key={'userId': {"S": principalId}})
+    client = boto3.resource('dynamodb')
+    table = client.Table('watch-me-users-table-dev')
+    response = table.get_item(Key={'userId': emailId})
     # Add your rules to policy here
     # example:
-    for k, v in response['Item'].items():
+    print("principleId: ", principalId)
+    print("emailId: ", emailId)
+    print("table response: ", response)
+    for k, v in response['Item']['incident']['allow'].items():
         # policy.allowMethod(v['S'], k)
-        if k != 'userId':
-            for k, v in v['M']['allow']['M'].items():
-                policy.allowMethod(v['S'], k)
+        # if k == 'incident':
+            # ??
+        # for k, v in v['allow']['M'].items():
+        policy.allowMethod(v, k)
 
     # Build policy
     authResponse = policy.build()
