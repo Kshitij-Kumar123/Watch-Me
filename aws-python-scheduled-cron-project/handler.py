@@ -24,32 +24,28 @@ def build_resp(body, status_code=200, content_type="application/json"):
         'headers': {
             'Access-Control-Allow-Headers': 'Content-Type',
             'Access-Control-Allow-Origin': '*',
-            # 'Content-Type': 'application/json',
-            # 'Access-Control-Allow-Origin': '*',
-            # 'Access-Control-Allow-Methods': '*',
-            # 'Access-Control-Allow-Credentials': '*'
         },
         'body': json.dumps(body),
         "isBase64Encoded": False
     }
 
-# Rename functions
-
 
 def pre_sign_up(event, context):
+    # Adds new signed up user to database
+    # Default Role should be consumer - allowed to make new incidents and view their own incidents
 
     db_client = boto3.resource('dynamodb')
     table = db_client.Table('watch-me-users-table-dev')
 
-    new_user_id = event["request"]["userAttributes"]["email"]
+    user_email = event["request"]["userAttributes"]["email"]
 
     response = table.put_item(
         Item={
-            'userId': new_user_id,
+            'userId': user_email,
             "subscribeStatus": False,
             'incident': {
                 "allow": {
-                    "/incident/86f9d64d-2099-4664-8c7d-c759c667a844": "GET"
+                    "/incident": "POST"
                 }
             }
         }
@@ -59,46 +55,77 @@ def pre_sign_up(event, context):
 
     return event
 
+# TODO: need to rework this
+# Needs to be an admin only endpoint
+
 
 def update_acl(event, context):
-    # Read dynamoDB stream from paystub table
-    for record in event['Records']:
-        principalId = record['dynamodb']['Keys']['userId']['S']
+    user_table = str(os.environ['USERS_TABLE'])
+    table = boto3.resource('dynamodb').Table(user_table)
+    print(event['body'])
+    event_body = json.loads(event['body'])
+    user_email = event_body['user_email']
+    user_acl = event_body['acl']
 
-        client = boto3.client('dynamodb')
-        response = record['dynamodb']['NewImage']
-        table = boto3.resource('dynamodb').Table('watch-me-users-table-dev')
+    print('user_email: ', user_email)
+    print('user_acl: ', user_acl)
+
+    try:
+        update_expression = ""
+        updated_attrs = {}
+        count = 1
+        last_key = list(user_acl)[-1]
+
+        for key, value in user_acl.items():
+            update_expression += f"set {key}.allow=:var{count}"
+            updated_attrs[f':var{count}'] = value
+            count += 1
+            if key != last_key:
+                update_expression += ", "
+
         response = table.update_item(
-            # Update acl table
             Key={
-                'userId': principalId
+                'userId': user_email
             },
-            UpdateExpression="set sendEmail.allow=:a",
-            ExpressionAttributeValues={
-                ":a": {
-                    "/sendEmail": "POST"
-                }
-            },
+            UpdateExpression=update_expression,
+            ExpressionAttributeValues=updated_attrs,
+            ReturnValues="UPDATED_NEW"
         )
+    except ClientError as err:
 
-    return event
+        if err.response['Error']['Code'] == 'ValidationException':
+            update_expression = ""
+            updated_attrs = {}
+            count = 1
+            last_key = list(user_acl)[-1]
+            for key, value in user_acl.items():
+                update_expression += f"set {key}=:var{count}"
+                updated_attrs[f':var{count}'] = {"allow": value}
+                count += 1
+                if key != last_key:
+                    update_expression += ", "
 
+            print(update_expression)
+            print(updated_attrs)
 
-def get_file_contents(bucket):
-    s3 = boto3.resource('s3')
-    selected_bucket = s3.Bucket(bucket)
+            response = table.update_item(
+                Key={
+                    'userId': user_email
+                },
+                UpdateExpression=update_expression,
+                ExpressionAttributeValues=updated_attrs,
+                ReturnValues="UPDATED_NEW"
+            )
 
-    file_contents = []
+            logger.error(
+                "Couldn't update user ACLs %s. Here's why: %s: %s",
+                user_email,
+                err.response['Error']['Code'], err.response['Error']['Message'])
 
-    for obj in selected_bucket.objects.all():
-        body = obj.get()['Body'].read()
-        filename = obj.key.split('/')[-1]
-        content = {
-            filename: body
-        }
-        file_contents.append(content)
+            return build_resp(body=response['Attributes'])
 
-    return file_contents
+    else:
+        return build_resp(body=response['Attributes'])
 
 
 def fetch_quotes_from_s3():
@@ -344,6 +371,8 @@ def delete_incidents(event, context):
     else:
         return build_resp(body={"message": f"Incident deleted with ID: {incident_id}"})
 
+# TODO: define them
+
 
 def subscribe_user(event, context):
     post = "subscribe user"
@@ -358,7 +387,7 @@ def get_subscribers(event, context):
 
 
 # Authorization handlers
-
+# TODO: restructure the auth ACL table
 def authorization(event, context):
     logger.info(event)
     print(event)
@@ -384,10 +413,6 @@ def authorization(event, context):
     print("emailId: ", emailId)
     print("table response: ", response)
     for k, v in response['Item']['incident']['allow'].items():
-        # policy.allowMethod(v['S'], k)
-        # if k == 'incident':
-            # ??
-        # for k, v in v['allow']['M'].items():
         policy.allowMethod(v, k)
 
     # Build policy
