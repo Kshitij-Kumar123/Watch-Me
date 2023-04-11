@@ -4,11 +4,19 @@ service: aws-serverless-python-project
 frameworkVersion: "3"
 
 # TODO:
-# Add authorization and endpoint restriction
-# Send emails to users to info they are subscribed to
+# MAKE THE FRONTEND!!!!
+# Clean up and restructure code files + add failure catching points -- today
+# Add authorization and endpoint restriction -- tbd today
+# Customers make incidents and send emails to users to info they are subscribed to -- today
 # add basic ticket management
+# - watch video for simple use cases
 # - just one organization with employees
 # insight emails about ticket with quote
+# push amplify, api for prod
+# additional stuff --
+# chatgpt integration??
+# queues?
+# delete old stacks
 
 custom:
   tableName: "watch-me-users-table-${sls:stage}"
@@ -109,7 +117,15 @@ functions:
           authorizer:
             name: customAuthorizer
           cors: true
-
+  getReporterIncidents:
+    handler: handler.get_reporter_incidents
+    events:
+      - http:
+          path: incident/reporter/{id}
+          method: get
+          authorizer:
+            name: customAuthorizer
+          cors: true
   createIncidents:
     handler: handler.create_incidents
     events:
@@ -126,8 +142,9 @@ functions:
       - http:
           path: incident/{id}
           method: patch
+          authorizer:
+            name: customAuthorizer
           cors: true
-          # authorizer: handler.authorization
 
   deleteIncidents:
     handler: handler.delete_incidents
@@ -135,8 +152,10 @@ functions:
       - http:
           path: incident/{id}
           method: delete
+          # authorizer:
+          #   name: customAuthorizer
           cors: true
-          # authorizer: handler.authorization
+
   customAuthorizer:
     handler: handler.authorization
 resources:

@@ -11,8 +11,6 @@ from botocore.exceptions import ClientError
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-s3 = boto3.resource("s3")
-
 # Format response in JSON
 
 
@@ -33,9 +31,9 @@ def build_resp(body, status_code=200, content_type="application/json"):
 def pre_sign_up(event, context):
     # Adds new signed up user to database
     # Default Role should be consumer - allowed to make new incidents and view their own incidents
-
+    user_table = str(os.environ['USERS_TABLE'])
     db_client = boto3.resource('dynamodb')
-    table = db_client.Table('watch-me-users-table-dev')
+    table = db_client.Table(user_table)
 
     user_email = event["request"]["userAttributes"]["email"]
 
@@ -138,7 +136,6 @@ def fetch_quotes_from_s3():
 
 
 def get_quotes(event, context):
-    print(event)
     json_content = fetch_quotes_from_s3()
     quotes_max_index = len(json_content["quotes"]) - 1
     selected_quote_index = random.randint(0, quotes_max_index)
@@ -147,7 +144,7 @@ def get_quotes(event, context):
     return build_resp(body={"quote": selected_quote, "event": event})
 
 
-def create_email(quote):
+def create_email_body(body):
     return f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
     <html lang="en">
    
@@ -168,8 +165,7 @@ def create_email(quote):
           font-family: Menlo, Monaco, Lucida Console, Liberation Mono,
             DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace;">
       
-        <p>{quote["quote"]}</p>
-        <blockquote>by {quote["author"]}</blockquote>
+        <p>{body}</p>
       
     </div>
           <br>
@@ -187,6 +183,51 @@ def create_email(quote):
            
     </body>
     </html>"""
+
+# TODO: generalize this send email function
+
+
+def generic_send_email(sender, recipients, subject, body_html, body_text=("Amazon SES Test (Python)\r\n"
+                                                                          "This email was sent with Amazon SES using the "
+                                                                          "AWS SDK for Python (Boto)."
+                                                                          ), CHARSET="UTF-8"):
+
+    # Create a new SES resource and specify a region.
+    client = boto3.client('ses')
+
+    # Try to send the email.
+    try:
+        # Provide the contents of the email.
+        response = client.send_email(
+            Destination={
+                'ToAddresses': recipients,
+            },
+            Message={
+                'Body': {
+                    'Html': {
+                        'Charset': CHARSET,
+                        'Data': body_html,
+                    },
+                    'Text': {
+                        'Charset': CHARSET,
+                        'Data': body_text,
+                    },
+                },
+                'Subject': {
+                    'Charset': CHARSET,
+                    'Data': subject,
+                },
+            },
+            Source=sender,
+        )
+
+    except ClientError as e:
+        print(e.response['Error']['Message'])
+        return build_resp(body={"message": e.response['Error']['Message']}, status_code=500)
+    else:
+        print("Email sent! Message ID:"),
+        print(response['MessageId'])
+        return build_resp(body={"message": f"Message successfully sent. {response['MessageId']}"})
 
 
 def send_email(event, context):
@@ -213,7 +254,7 @@ def send_email(event, context):
     selected_quote_index = random.randint(0, file_len)
     selected_quote = json_content["quotes"][selected_quote_index]
 
-    BODY_HTML = create_email(selected_quote)
+    BODY_HTML = create_email_body(selected_quote["quote"])
 
     # The character encoding for the email.
     CHARSET = "UTF-8"
@@ -259,14 +300,7 @@ def send_email(event, context):
         return build_resp(body={"message": f"Message successfully sent. {response['MessageId']}"})
 
 
-# TODO
-# CRUD with incidents -- v1 done
-# Add authorization and endpoint restriction for such incidents --
-# Send emails to users to info they are subscribed to: insight emails about ticket with quote
-# ask gpt?? quick feature??
-
 def get_incidents(event, context):
-    # Get all subscribers of the incident by pkey (id) and/or skey (active)
     incidents_table = str(os.environ['INCIDENTS_TABLE'])
     db_client = boto3.resource('dynamodb')
     table = db_client.Table(incidents_table)
@@ -282,7 +316,32 @@ def get_incidents(event, context):
             "Couldn't get incident %s. Here's why: %s: %s",
             incident_id,
             err.response['Error']['Code'], err.response['Error']['Message'])
-        return build_resp(body=err.response['Error'])
+
+        return build_resp(body=err.response['Error'], status_code=err.response['Error']['Code'])
+    else:
+        item = response['Item']
+        return build_resp(body=item)
+
+
+def get_reporter_incidents(event, context):
+
+    incidents_table = str(os.environ['INCIDENTS_TABLE'])
+    db_client = boto3.resource('dynamodb')
+    table = db_client.Table(incidents_table)
+    reporter_id = event['pathParameters']['id']
+
+    try:
+        response = table.get_item(Key={
+            'reporter': reporter_id
+        })
+
+    except ClientError as err:
+        logger.error(
+            "Couldn't get incident for user %s. Here's why: %s: %s",
+            reporter_id,
+            err.response['Error']['Code'], err.response['Error']['Message'])
+
+        return build_resp(body=err.response['Error'], status_code=err.response['Error']['Code'])
     else:
         item = response['Item']
         return build_resp(body=item)
@@ -294,22 +353,28 @@ def create_incidents(event, context):
     table = db_client.Table(incidents_table)
     incident_id = str(uuid.uuid4())
 
+    user_email = event["request"]["userAttributes"]["email"]
+
     try:
         response = table.put_item(
             Item={
                 "incidentId": incident_id,
-                "reporter": "example"
+                "reporter": user_email,
+                "assignedTo": ""
             }
         )
     except ClientError as err:
         logger.error(
             "Couldn't create incident. Here's why: %s: %s",
             err.response['Error']['Code'], err.response['Error']['Message'])
-        raise
+
+        return build_resp(status_code=err.response['Error']['Code'], body={
+            "message": err.response['Error']['Message']
+        })
     else:
         return build_resp(body={
             "incidentId": incident_id,
-            "reporter": "example"
+            "reporter": user_email
         })
 
 
@@ -319,36 +384,57 @@ def update_incidents(event, context):
     table = db_client.Table(incidents_table)
     incident_id = event['pathParameters']['id']
 
+    request_body = json.loads(event['body'])
+    print(event)
     try:
         response = table.update_item(
             Key={'incidentId': incident_id},
-            UpdateExpression="set info.incidentStatus=:s",
+            UpdateExpression="set info.incidentStatus=:s, set info.reporter=:s1, set info.assignedTo=:s2",
             ExpressionAttributeValues={
-                ":s": "complete"
+                ":s": request_body['incidentStatus'],
+                ":s1": request_body['reporter'],
+                ":s2": request_body['assignedTo']
             },
             ReturnValues="UPDATED_NEW"
         )
     except ClientError as err:
         if err.response['Error']['Code'] == 'ValidationException':
+
             response = table.update_item(
                 Key={'incidentId': incident_id},
-                UpdateExpression="set incidentStatus = :incidentStatus",
+                UpdateExpression="set #src1 = :v1, #src2 = :v2, #src3 = :v3",
                 ExpressionAttributeValues={
-                    ':incidentStatus': {
-                        ':c': "complete"
-                    }
+                    ":v1": request_body['incidentStatus'],
+                    ":v2": request_body['reporter'],
+                    ":v3": request_body['assignedTo']
+                },
+                ExpressionAttributeNames={
+                    '#src1': 'incidentStatus',
+                    '#src2': 'reporter',
+                    '#src3': 'assignedTo',
                 },
                 ReturnValues="UPDATED_NEW"
             )
+            
+            recipients = [request_body['reporter'], request_body['assignedTo']]
+            # TODO: fix Copy
+            # Email address is not verified. The following identities failed the check in region US-EAST-1:
 
+            generic_send_email(sender="kshitijkumar.atom@gmail.com",
+                               subject=f"INCIDENT {incident_id}", body_html=create_email_body(f"INCIDENT {incident_id} updated by {request_body['assignedTo']}"), recipients=recipients)
             return build_resp(body=response['Attributes'])
 
         logger.error(
             "Couldn't update incident %s. Here's why: %s: %s",
             incident_id,
             err.response['Error']['Code'], err.response['Error']['Message'])
-        raise
     else:
+        # send email about update
+        recipients = [request_body['reporter'], request_body['assignedTo']]
+
+        generic_send_email(sender="kshitijkumar.atom@gmail.com",
+                           subject=f"INCIDENT {incident_id}", body_html=create_email_body(f"INCIDENT {incident_id} updated"), recipients=recipients)
+
         return build_resp(body=response['Attributes'])
 
 
@@ -387,14 +473,10 @@ def get_subscribers(event, context):
 
 
 # Authorization handlers
-# TODO: restructure the auth ACL table
 def authorization(event, context):
-    logger.info(event)
-    print(event)
     token = event['authorizationToken']
     client = boto3.client('cognito-idp')
     response = client.get_user(AccessToken=token)
-    print("user response: ", response)
     # get user email for now --- TODO: will do uuid later
     principalId = response['UserAttributes'][0]['Value']
     emailId = response['UserAttributes'][2]['Value']
@@ -404,16 +486,21 @@ def authorization(event, context):
     policy = AuthPolicy(principalId, awsAccountId)
 
     # Get rules from auth table
+    user_table = str(os.environ['USERS_TABLE'])
     client = boto3.resource('dynamodb')
-    table = client.Table('watch-me-users-table-dev')
+    table = client.Table(user_table)
     response = table.get_item(Key={'userId': emailId})
     # Add your rules to policy here
     # example:
     print("principleId: ", principalId)
     print("emailId: ", emailId)
     print("table response: ", response)
-    for k, v in response['Item']['incident']['allow'].items():
-        policy.allowMethod(v, k)
+
+    available_endpoints = ['incident', 'getSubscribers']
+
+    for endpoint in available_endpoints:
+        for k, v in response['Item'][endpoint]['allow'].items():
+            policy.allowMethod(v, k)
 
     # Build policy
     authResponse = policy.build()
