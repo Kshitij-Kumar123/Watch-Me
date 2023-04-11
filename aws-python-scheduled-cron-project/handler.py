@@ -7,6 +7,7 @@ import os
 import re
 import uuid
 from botocore.exceptions import ClientError
+from boto3.dynamodb.conditions import Key
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -43,7 +44,8 @@ def pre_sign_up(event, context):
             "subscribeStatus": False,
             'incident': {
                 "allow": {
-                    "/incident": "POST"
+                    "/incident": "POST", 
+                    f"/incident/reporter/{user_email}": "GET"
                 }
             }
         }
@@ -69,13 +71,13 @@ def update_acl(event, context):
     print('user_acl: ', user_acl)
 
     try:
-        update_expression = ""
+        update_expression = "set "
         updated_attrs = {}
         count = 1
         last_key = list(user_acl)[-1]
 
         for key, value in user_acl.items():
-            update_expression += f"set {key}.allow=:var{count}"
+            update_expression += f"{key}.allow=:var{count}"
             updated_attrs[f':var{count}'] = value
             count += 1
             if key != last_key:
@@ -92,12 +94,14 @@ def update_acl(event, context):
     except ClientError as err:
 
         if err.response['Error']['Code'] == 'ValidationException':
-            update_expression = ""
+            update_expression = "set "
+            expression_names = {}
             updated_attrs = {}
             count = 1
             last_key = list(user_acl)[-1]
             for key, value in user_acl.items():
-                update_expression += f"set {key}=:var{count}"
+                update_expression += f"#src{count}=:var{count}"
+                expression_names[f'#src{count}'] = key
                 updated_attrs[f':var{count}'] = {"allow": value}
                 count += 1
                 if key != last_key:
@@ -105,6 +109,7 @@ def update_acl(event, context):
 
             print(update_expression)
             print(updated_attrs)
+            print(expression_names)
 
             response = table.update_item(
                 Key={
@@ -112,6 +117,7 @@ def update_acl(event, context):
                 },
                 UpdateExpression=update_expression,
                 ExpressionAttributeValues=updated_attrs,
+                ExpressionAttributeNames=expression_names,
                 ReturnValues="UPDATED_NEW"
             )
 
@@ -184,7 +190,7 @@ def create_email_body(body):
     </body>
     </html>"""
 
-# TODO: generalize this send email function
+# TODO: Push for AWS SES Prod
 
 
 def generic_send_email(sender, recipients, subject, body_html, body_text=("Amazon SES Test (Python)\r\n"
@@ -331,9 +337,9 @@ def get_reporter_incidents(event, context):
     reporter_id = event['pathParameters']['id']
 
     try:
-        response = table.get_item(Key={
-            'reporter': reporter_id
-        })
+        # TODO: Make reporter as secondary key
+        fe = Key('reporter').eq(reporter_id)
+        response = table.scan(FilterExpression=fe)
 
     except ClientError as err:
         logger.error(
@@ -343,7 +349,7 @@ def get_reporter_incidents(event, context):
 
         return build_resp(body=err.response['Error'], status_code=err.response['Error']['Code'])
     else:
-        item = response['Item']
+        item = response['Items']
         return build_resp(body=item)
 
 
@@ -417,11 +423,10 @@ def update_incidents(event, context):
             )
             
             recipients = [request_body['reporter'], request_body['assignedTo']]
-            # TODO: fix Copy
-            # Email address is not verified. The following identities failed the check in region US-EAST-1:
+            # TODO: Email address is not verified. The following identities failed the check in region US-EAST-1:
 
-            generic_send_email(sender="kshitijkumar.atom@gmail.com",
-                               subject=f"INCIDENT {incident_id}", body_html=create_email_body(f"INCIDENT {incident_id} updated by {request_body['assignedTo']}"), recipients=recipients)
+            # generic_send_email(sender="kshitijkumar.atom@gmail.com",
+            #                    subject=f"INCIDENT {incident_id}", body_html=create_email_body(f"INCIDENT {incident_id} updated by {request_body['assignedTo']}"), recipients=recipients)
             return build_resp(body=response['Attributes'])
 
         logger.error(
@@ -496,7 +501,7 @@ def authorization(event, context):
     print("emailId: ", emailId)
     print("table response: ", response)
 
-    available_endpoints = ['incident', 'getSubscribers']
+    available_endpoints = ['incident', 'getSubscribers', 'updatePermissions']
 
     for endpoint in available_endpoints:
         for k, v in response['Item'][endpoint]['allow'].items():

@@ -7,7 +7,10 @@ frameworkVersion: "3"
 # MAKE THE FRONTEND!!!!
 # Clean up and restructure code files + add failure catching points -- today
 # Add authorization and endpoint restriction -- tbd today
-# Customers make incidents and send emails to users to info they are subscribed to -- today
+# better way to test via Postman
+# Customers make incidents and send emails to users to info they are subscribed to -- issue
+#   --- need to push for aws ses prod 
+#   --- can dev test with manual verified accounts for now
 # add basic ticket management
 # - watch video for simple use cases
 # - just one organization with employees
@@ -79,6 +82,8 @@ functions:
           path: updatePermissions
           method: post
           cors: true
+          authorizer:
+            name: customAuthorizer
   sendEmail:
     handler: handler.send_email
     events:
