@@ -32,6 +32,16 @@ def build_resp(body, status_code=200, content_type="application/json"):
 def pre_sign_up(event, context):
     # Adds new signed up user to database
     # Default Role should be consumer - allowed to make new incidents and view their own incidents
+
+    # User attrs
+    # - user email
+    # - role - admin, employee, user
+    # - name
+    # - date created
+    # - summary
+    # - specialization
+    # - applicable ACLs -- seperate table? Not needed probably
+
     user_table = str(os.environ['USERS_TABLE'])
     db_client = boto3.resource('dynamodb')
     table = db_client.Table(user_table)
@@ -44,7 +54,7 @@ def pre_sign_up(event, context):
             "subscribeStatus": False,
             'incident': {
                 "allow": {
-                    "/incident": "POST", 
+                    "/incident": "POST",
                     f"/incident/reporter/{user_email}": "GET"
                 }
             }
@@ -55,7 +65,6 @@ def pre_sign_up(event, context):
 
     return event
 
-# TODO: need to rework this
 # Needs to be an admin only endpoint
 
 
@@ -354,6 +363,20 @@ def get_reporter_incidents(event, context):
 
 
 def create_incidents(event, context):
+
+    # create new incidents -- allowed to everyone logged in
+    # - Incident Status
+    # - Reporter
+    # - AssignedTo
+    # - Title
+    # - Summary
+    # - Task Type
+    # - Attachments or Images
+    # - Start and End date
+    # - complexity rating + time put in
+    # - Employee and user comments
+    # - history tracking
+
     incidents_table = str(os.environ['INCIDENTS_TABLE'])
     db_client = boto3.resource('dynamodb')
     table = db_client.Table(incidents_table)
@@ -421,7 +444,7 @@ def update_incidents(event, context):
                 },
                 ReturnValues="UPDATED_NEW"
             )
-            
+
             recipients = [request_body['reporter'], request_body['assignedTo']]
             # TODO: Email address is not verified. The following identities failed the check in region US-EAST-1:
 
@@ -462,22 +485,9 @@ def delete_incidents(event, context):
     else:
         return build_resp(body={"message": f"Incident deleted with ID: {incident_id}"})
 
-# TODO: define them
-
-
-def subscribe_user(event, context):
-    post = "subscribe user"
-
-    return build_resp(body={"post": post})
-
-
-def get_subscribers(event, context):
-    post = "get subscribers"
-
-    return build_resp(body={"post": post})
-
-
 # Authorization handlers
+
+
 def authorization(event, context):
     token = event['authorizationToken']
     client = boto3.client('cognito-idp')

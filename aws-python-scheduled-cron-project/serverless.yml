@@ -68,13 +68,6 @@ functions:
           path: quotes
           method: get
           cors: true
-  subscribe:
-    handler: handler.subscribe_user
-    events:
-      - http:
-          path: subscribeUser
-          method: post
-          cors: true
   updatePermissions:
     handler: handler.update_acl
     events:
@@ -94,15 +87,6 @@ functions:
             name: customAuthorizer
           cors: true
       - schedule: cron(0 13 * * ? *)
-  getSubscribers:
-    handler: handler.get_subscribers
-    events:
-      - http:
-          path: getSubscribers
-          method: get
-          authorizer:
-            name: customAuthorizer
-          cors: true
   preSignUp:
     handler: handler.pre_sign_up
     events:
