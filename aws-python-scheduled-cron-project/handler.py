@@ -322,29 +322,32 @@ def send_email(event, context):
         print(response['MessageId'])
         return build_resp(body={"message": f"Message successfully sent. {response['MessageId']}"})
 
+def get_all_incidents(event, context):
+    incidents_table = 'incident-tickets-table3-dev'
+    db_client = boto3.resource('dynamodb')
+    table = db_client.Table(incidents_table)
+
+    response = table.scan()
+    data = response['Items']
+    
+    return build_resp(body=data)
+
 
 def get_incidents(event, context):
-    incidents_table = 'incident-tickets-table-dev'
+    incidents_table = 'incident-tickets-table3-dev'
     db_client = boto3.resource('dynamodb')
     table = db_client.Table(incidents_table)
     incident_id = event['pathParameters']['id']
 
     try:
-        print("checking by dev id: ", incident_id)
-        # response = table.query(
-        #     IndexName='ReporterIdIndex',
-        #     KeyConditionExpression=Key('reporterId').eq(
-        #         'gebahoc482@marikuza.com')
-        # )
-
         response = table.get_item(Key={
             'incidentId': incident_id
         })
 
     except ClientError as err:
         logger.error(
-            "Couldn't get incident %s. Here's why: %s: %s",
-            'incident_id',
+            "Couldn't get incident %s. Here's w2y: %s: %s",
+            incident_id,
             err.response['Error']['Code'], err.response['Error']['Message'])
 
         return build_resp(body=err.response['Error']['Message'], status_code=err.response['Error']['Code'])
@@ -355,7 +358,7 @@ def get_incidents(event, context):
 
 def get_reporter_incidents(event, context):
 
-    incidents_table = 'incident-tickets-table-dev'
+    incidents_table = 'incident-tickets-table3-dev'
     db_client = boto3.resource('dynamodb')
     table = db_client.Table(incidents_table)
     reporter_id = event['pathParameters']['id']
@@ -363,13 +366,12 @@ def get_reporter_incidents(event, context):
     try:
         response = table.query(
             IndexName='ReporterIdIndex',
-            KeyConditionExpression=Key('reporterId').eq(
-                'gebahoc482@marikuza.com')
+            KeyConditionExpression=Key('reporterId').eq(reporter_id)
         )
 
     except ClientError as err:
         logger.error(
-            "Couldn't get incident for user %s. Here's why: %s: %s",
+            "Couldn't get incident for user %s. 2Here's why: %s: %s",
             reporter_id,
             err.response['Error']['Code'], err.response['Error']['Message'])
 
@@ -379,50 +381,48 @@ def get_reporter_incidents(event, context):
         return build_resp(body=item)
 
 
+def get_developer_incidents(event, context):
+
+    incidents_table = 'incident-tickets-table3-dev'
+    db_client = boto3.resource('dynamodb')
+    table = db_client.Table(incidents_table)
+    developer_id = event['pathParameters']['id']
+
+    try:
+        response = table.query(
+            IndexName='DeveloperIdIndex',
+            KeyConditionExpression=Key('developerId').eq(
+                developer_id)
+        )
+
+    except ClientError as err:
+        logger.error(
+            "Couldn't get incident for user %s. 2Here's why: %s: %s",
+            developer_id,
+            err.response['Error']['Code'], err.response['Error']['Message'])
+
+        return build_resp(body=err.response['Error'], status_code=err.response['Error']['Code'])
+    else:
+        item = response['Items']
+        return build_resp(body=item)
+
+
 def create_incidents(event, context):
-
-    # TODO: finalize and push new incident table + start modify handlers code
-
-    # TODO: worst case scenario: scan for reporter, assignedTo id
-    # create new dynamodb for testing for new designs
-
-    # Get focused
-    # design choices:
-    # pk: incident type
-    # sk: #incident_id#timestamp#REPORTER:reporter_id#DEVELOPER:developer_id: sort by beginsWith or endsWith
-    # OR
-    # GSI: pk as reporter and other pk as employee. sk could be #timestamps#incidentId for both
-    # OR
-    # I want developers to see all tickets anyway so sorting by incident type is nice + time
-    # BUT only want users to see their tickets
-
-    # how would update work??? check sk for incident id??
-
-    # april l2
-
-    # Want developers to see tickets assigned and other tickets
-    # want users to only see tickets they have
-    # want to edit only one specific ticket at a time
-
-    # Edit: use pkey as resp. user and find exact incident to post to
-    # OG
-    # pk: reporter_id
-    # sk: timestamp
-    # sk: #incident type # active
+    # Primary key
+    # pk: incident id
+    # sk: 2dont need one
 
     # gs1
+    # pk: reporter_id
+    # sk: timestamp
+
+    # gs2
     # pk: developer_id
     # sk: timestamp
-    # sk: #incident type # active
-
-    # general incidents querying for developer reference
-    # gs2
-    # pk: incident id
-    # sk: dont need one
 
     # create new incidents -- allowed to everyone logged in
     # - incident Id
-    # - Reporter
+    # - Re2porter
     # - AssignedTo
     # - Incident Status
     # - Title
@@ -434,14 +434,12 @@ def create_incidents(event, context):
     # - Employee and user comments
     # - history tracking
 
-    incidents_table = 'incident-tickets-table-dev'
+    incidents_table = 'incident-tickets-table3-dev'
     db_client = boto3.resource('dynamodb')
     table = db_client.Table(incidents_table)
     incident_id = str(uuid.uuid4())
     event_body = json.loads(event['body'])
 
-    # reporter_email = event["request"]["userAttributes"]["email"]
-    reporter_email = "gebahoc482@marikuza.com"
     try:
         current_date = datetime.now()
         iso_time_str = current_date.strftime('%Y-%m-%d %I:%M:%S %p')
@@ -456,7 +454,7 @@ def create_incidents(event, context):
         )
     except ClientError as err:
         logger.error(
-            "Couldn't create incident. Here's why: %s: %s",
+            "Couldn't create incident. Here's why: 2%s: %s",
             err.response['Error']['Code'], err.response['Error']['Message'])
 
         return build_resp(status_code=err.response['Error']['Code'], body={
@@ -472,44 +470,67 @@ def create_incidents(event, context):
 
 
 def update_incidents(event, context):
-    incidents_table = str(os.environ['INCIDENTS_TABLE'])
+    incidents_table = 'incident-tickets-table3-dev'
     db_client = boto3.resource('dynamodb')
     table = db_client.Table(incidents_table)
     incident_id = event['pathParameters']['id']
 
     request_body = json.loads(event['body'])
-    print(event)
+
     try:
+
+        update_expression = "set "
+        updated_attrs = {}
+        count = 1
+        last_key = list(request_body)[-1]
+
+        for key, value in request_body.items():
+            update_expression += f"info.{key}=:var{count}"
+            updated_attrs[f':var{count}'] = value
+            if key != last_key:
+                update_expression += ", "
+            count += 1
+
+        print(update_expression)
+        print(updated_attrs)
+
         response = table.update_item(
             Key={'incidentId': incident_id},
-            UpdateExpression="set info.incidentStatus=:s, set info.reporter=:s1, set info.assignedTo=:s2",
-            ExpressionAttributeValues={
-                ":s": request_body['incidentStatus'],
-                ":s1": request_body['reporter'],
-                ":s2": request_body['assignedTo']
-            },
+            UpdateExpression=update_expression,
+            ExpressionAttributeValues=updated_attrs,
             ReturnValues="UPDATED_NEW"
         )
+
     except ClientError as err:
         if err.response['Error']['Code'] == 'ValidationException':
+            update_expression = "set "
+            expression_attr_names = {}
+            updated_attrs = {}
+            count = 1
+            last_key = list(request_body)[-1]
+
+            for key, value in request_body.items():
+                update_expression += f"#src{count}=:v{count}"
+                updated_attrs[f':v{count}'] = value
+                expression_attr_names[f"#src{count}"] = key
+
+                if key != last_key:
+                    update_expression += ", "
+                count += 1
+
+            print(update_expression)
+            print(updated_attrs)
+            print(expression_attr_names)
 
             response = table.update_item(
                 Key={'incidentId': incident_id},
-                UpdateExpression="set #src1 = :v1, #src2 = :v2, #src3 = :v3",
-                ExpressionAttributeValues={
-                    ":v1": request_body['incidentStatus'],
-                    ":v2": request_body['reporter'],
-                    ":v3": request_body['assignedTo']
-                },
-                ExpressionAttributeNames={
-                    '#src1': 'incidentStatus',
-                    '#src2': 'reporter',
-                    '#src3': 'assignedTo',
-                },
+                UpdateExpression=update_expression,
+                ExpressionAttributeValues=updated_attrs,
+                ExpressionAttributeNames=expression_attr_names,
                 ReturnValues="UPDATED_NEW"
             )
 
-            recipients = [request_body['reporter'], request_body['assignedTo']]
+            # recipients = [request_body['reporter'], request_body['assignedTo']]
             # TODO: Email address is not verified. The following identities failed the check in region US-EAST-1:
 
             # generic_send_email(sender="kshitijkumar.atom@gmail.com",
@@ -517,15 +538,15 @@ def update_incidents(event, context):
             return build_resp(body=response['Attributes'])
 
         logger.error(
-            "Couldn't update incident %s. Here's why: %s: %s",
+            "Couldn't update incident %s. Here's wh2y: %s: %s",
             incident_id,
             err.response['Error']['Code'], err.response['Error']['Message'])
     else:
         # send email about update
         recipients = [request_body['reporter'], request_body['assignedTo']]
 
-        generic_send_email(sender="kshitijkumar.atom@gmail.com",
-                           subject=f"INCIDENT {incident_id}", body_html=create_email_body(f"INCIDENT {incident_id} updated"), recipients=recipients)
+        # generic_send_email(sender="kshitijkumar.atom@gmail.com",
+        #                    subject=f"INCIDENT {incident_id}", body_html=create_email_body(f"INCIDENT {incident_id} updated"), recipients=recipients)
 
         return build_resp(body=response['Attributes'])
 
@@ -542,7 +563,7 @@ def delete_incidents(event, context):
         })
     except ClientError as err:
         logger.error(
-            "Couldn't delete incident %s. Here's why: %s: %s",
+            "Couldn't delete incident %s. Here's wh2y: %s: %s",
             incident_id,
             err.response['Error']['Code'], err.response['Error']['Message'])
         raise
@@ -573,7 +594,7 @@ def authorization(event, context):
     print("emailId: ", emailId)
     print("table response: ", response)
 
-    available_endpoints = ['incident', 'getSubscribers', 'updatePermissions']
+    available_endpoints = ['incident', 'updatePermissions']
 
     for endpoint in available_endpoints:
         for k, v in response['Item'][endpoint]['allow'].items():

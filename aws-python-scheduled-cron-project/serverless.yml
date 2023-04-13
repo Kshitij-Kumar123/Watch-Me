@@ -25,7 +25,7 @@ custom:
   tableName: "watch-me-users-table-${sls:stage}"
   incidentsTableName: "incidents-table-${sls:stage}"
   region: ${self:provider.region}
-  incidentTicketsTableName: "incident-tickets-table-${sls:stage}"
+  incidentTicketsTableName: "incident-tickets-table3-${sls:stage}"
 
 provider:
   name: aws
@@ -54,8 +54,24 @@ provider:
             - Fn::GetAtt: [UsersTable, Arn]
             - Fn::GetAtt: [IncidentsTable, Arn]
             - Fn::GetAtt: [IncidentsTicketTable, Arn]
-            - Fn::Join: ['/', ["Fn::GetAtt": [ IncidentsTicketTable, Arn ], 'index', 'ReporterIdIndex']]
-            - Fn::Join: ['/', ["Fn::GetAtt": [ IncidentsTicketTable, Arn ], 'index', 'DeveloperIdIndex']]
+            - Fn::Join:
+                [
+                  "/",
+                  [
+                    "Fn::GetAtt": [IncidentsTicketTable, Arn],
+                    "index",
+                    "ReporterIdIndex",
+                  ],
+                ]
+            - Fn::Join:
+                [
+                  "/",
+                  [
+                    "Fn::GetAtt": [IncidentsTicketTable, Arn],
+                    "index",
+                    "DeveloperIdIndex",
+                  ],
+                ]
 
         - Effect: Allow
           Action:
@@ -104,6 +120,16 @@ functions:
           forceDeploy: true
 
   # Incidents CRUD
+  getAllIncidents:
+    handler: handler.get_all_incidents
+    events:
+      - http:
+          path: incident/all
+          method: get
+          # authorizer:
+          #   name: customAuthorizer
+          cors: true
+
   getIncidents:
     handler: handler.get_incidents
     events:
@@ -113,6 +139,9 @@ functions:
           # authorizer:
           #   name: customAuthorizer
           cors: true
+
+  
+
   getReporterIncidents:
     handler: handler.get_reporter_incidents
     events:
@@ -122,6 +151,17 @@ functions:
           # authorizer:
           #   name: customAuthorizer
           cors: true
+
+  getDeveloperIncidents:
+    handler: handler.get_developer_incidents
+    events:
+      - http:
+          path: incident/developer/{id}
+          method: get
+          # authorizer:
+          #   name: customAuthorizer
+          cors: true
+
   createIncidents:
     handler: handler.create_incidents
     events:
@@ -138,8 +178,8 @@ functions:
       - http:
           path: incident/{id}
           method: patch
-          authorizer:
-            name: customAuthorizer
+          # authorizer:
+          #   name: customAuthorizer
           cors: true
 
   deleteIncidents:
