@@ -6,10 +6,10 @@ frameworkVersion: "3"
 # TODO:
 # MAKE THE FRONTEND!!!!
 # Clean up and restructure code files + add failure catching points -- today
-# Add authorization and endpoint restriction -- tbd today
+# Add authorization and endpoint restriction -- done
 # better way to test via Postman
 # Customers make incidents and send emails to users to info they are subscribed to -- issue
-#   --- need to push for aws ses prod 
+#   --- need to push for aws ses prod
 #   --- can dev test with manual verified accounts for now
 # add basic ticket management
 # - watch video for simple use cases
@@ -25,6 +25,7 @@ custom:
   tableName: "watch-me-users-table-${sls:stage}"
   incidentsTableName: "incidents-table-${sls:stage}"
   region: ${self:provider.region}
+  incidentTicketsTableName: "incident-tickets-table-${sls:stage}"
 
 provider:
   name: aws
@@ -48,9 +49,14 @@ provider:
             - dynamodb:PutItem
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
+            - dynamodb:BatchGetItem
           Resource:
             - Fn::GetAtt: [UsersTable, Arn]
             - Fn::GetAtt: [IncidentsTable, Arn]
+            - Fn::GetAtt: [IncidentsTicketTable, Arn]
+            - Fn::Join: ['/', ["Fn::GetAtt": [ IncidentsTicketTable, Arn ], 'index', 'ReporterIdIndex']]
+            - Fn::Join: ['/', ["Fn::GetAtt": [ IncidentsTicketTable, Arn ], 'index', 'DeveloperIdIndex']]
+
         - Effect: Allow
           Action:
             - "ses:SendEmail"
@@ -59,6 +65,7 @@ provider:
     USERS_TABLE: ${self:custom.tableName}
     REGION: ${self:provider.region}
     INCIDENTS_TABLE: "incidents-table-${sls:stage}"
+    INCIDENTS_TICKET_TABLE: "{self:provider.incidentTicketsTableName}"
 
 functions:
   quotes:
@@ -103,8 +110,8 @@ functions:
       - http:
           path: incident/{id}
           method: get
-          authorizer:
-            name: customAuthorizer
+          # authorizer:
+          #   name: customAuthorizer
           cors: true
   getReporterIncidents:
     handler: handler.get_reporter_incidents
@@ -112,8 +119,8 @@ functions:
       - http:
           path: incident/reporter/{id}
           method: get
-          authorizer:
-            name: customAuthorizer
+          # authorizer:
+          #   name: customAuthorizer
           cors: true
   createIncidents:
     handler: handler.create_incidents
@@ -121,8 +128,8 @@ functions:
       - http:
           path: incident
           method: post
-          authorizer:
-            name: customAuthorizer
+          # authorizer:
+          #   name: customAuthorizer
           cors: true
 
   updateIncidents:
@@ -192,6 +199,52 @@ resources:
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:custom.tableName}
 
+    IncidentsTicketTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.incidentTicketsTableName}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: reporterId
+            AttributeType: S
+          - AttributeName: developerId
+            AttributeType: S
+          - AttributeName: incidentId
+            AttributeType: S
+          - AttributeName: timestamp
+            AttributeType: S
+          # - AttributeName: incidentTags
+          #   AttributeType: S
+        KeySchema:
+          - AttributeName: incidentId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: ReporterIdIndex
+            KeySchema:
+              - AttributeName: reporterId
+                KeyType: HASH
+              - AttributeName: timestamp
+                KeyType: RANGE
+              # - AttributeName: incidentTags
+              #   KeyType: RANGE
+            Projection:
+              ProjectionType: "ALL"
+            # ProvisionedThroughput:
+            #   ReadCapacityUnits: 1
+            #   WriteCapacityUnits: 1
+          - IndexName: DeveloperIdIndex
+            KeySchema:
+              - AttributeName: developerId
+                KeyType: HASH
+              - AttributeName: timestamp
+                KeyType: RANGE
+              # - AttributeName: incidentTags
+              #   KeyType: RANGE
+            Projection:
+              ProjectionType: "ALL"
+            # ProvisionedThroughput:
+            #   ReadCapacityUnits: 1
+            #   WriteCapacityUnits: 1
     IncidentsTable:
       Type: AWS::DynamoDB::Table
       Properties:

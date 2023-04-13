@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import json
 import logging
 import boto3
@@ -35,7 +35,8 @@ def pre_sign_up(event, context):
 
     # User attrs
     # - user email
-    # - role - admin, employee, user
+    # - user id for incidents
+    # - role - admin, developer, customer
     # - name
     # - date created
     # - summary
@@ -47,11 +48,18 @@ def pre_sign_up(event, context):
     table = db_client.Table(user_table)
 
     user_email = event["request"]["userAttributes"]["email"]
+    current_date = datetime.now()
+
+    iso_time_str = current_date.strftime('%Y-%m-%dT%H:%M:%S.%f%z')
 
     response = table.put_item(
         Item={
             'userId': user_email,
-            "subscribeStatus": False,
+            'userCognitoId': '',  # temp
+            'role': 'customer',
+            'name': "",
+            "createdAt": iso_time_str,
+            'summary': "",
             'incident': {
                 "allow": {
                     "/incident": "POST",
@@ -316,23 +324,30 @@ def send_email(event, context):
 
 
 def get_incidents(event, context):
-    incidents_table = str(os.environ['INCIDENTS_TABLE'])
+    incidents_table = 'incident-tickets-table-dev'
     db_client = boto3.resource('dynamodb')
     table = db_client.Table(incidents_table)
     incident_id = event['pathParameters']['id']
 
     try:
+        print("checking by dev id: ", incident_id)
+        # response = table.query(
+        #     IndexName='ReporterIdIndex',
+        #     KeyConditionExpression=Key('reporterId').eq(
+        #         'gebahoc482@marikuza.com')
+        # )
+
         response = table.get_item(Key={
-            'incidentId': event['pathParameters']['id']
+            'incidentId': incident_id
         })
 
     except ClientError as err:
         logger.error(
             "Couldn't get incident %s. Here's why: %s: %s",
-            incident_id,
+            'incident_id',
             err.response['Error']['Code'], err.response['Error']['Message'])
 
-        return build_resp(body=err.response['Error'], status_code=err.response['Error']['Code'])
+        return build_resp(body=err.response['Error']['Message'], status_code=err.response['Error']['Code'])
     else:
         item = response['Item']
         return build_resp(body=item)
@@ -340,15 +355,17 @@ def get_incidents(event, context):
 
 def get_reporter_incidents(event, context):
 
-    incidents_table = str(os.environ['INCIDENTS_TABLE'])
+    incidents_table = 'incident-tickets-table-dev'
     db_client = boto3.resource('dynamodb')
     table = db_client.Table(incidents_table)
     reporter_id = event['pathParameters']['id']
 
     try:
-        # TODO: Make reporter as secondary key
-        fe = Key('reporter').eq(reporter_id)
-        response = table.scan(FilterExpression=fe)
+        response = table.query(
+            IndexName='ReporterIdIndex',
+            KeyConditionExpression=Key('reporterId').eq(
+                'gebahoc482@marikuza.com')
+        )
 
     except ClientError as err:
         logger.error(
@@ -364,10 +381,50 @@ def get_reporter_incidents(event, context):
 
 def create_incidents(event, context):
 
+    # TODO: finalize and push new incident table + start modify handlers code
+
+    # TODO: worst case scenario: scan for reporter, assignedTo id
+    # create new dynamodb for testing for new designs
+
+    # Get focused
+    # design choices:
+    # pk: incident type
+    # sk: #incident_id#timestamp#REPORTER:reporter_id#DEVELOPER:developer_id: sort by beginsWith or endsWith
+    # OR
+    # GSI: pk as reporter and other pk as employee. sk could be #timestamps#incidentId for both
+    # OR
+    # I want developers to see all tickets anyway so sorting by incident type is nice + time
+    # BUT only want users to see their tickets
+
+    # how would update work??? check sk for incident id??
+
+    # april l2
+
+    # Want developers to see tickets assigned and other tickets
+    # want users to only see tickets they have
+    # want to edit only one specific ticket at a time
+
+    # Edit: use pkey as resp. user and find exact incident to post to
+    # OG
+    # pk: reporter_id
+    # sk: timestamp
+    # sk: #incident type # active
+
+    # gs1
+    # pk: developer_id
+    # sk: timestamp
+    # sk: #incident type # active
+
+    # general incidents querying for developer reference
+    # gs2
+    # pk: incident id
+    # sk: dont need one
+
     # create new incidents -- allowed to everyone logged in
-    # - Incident Status
+    # - incident Id
     # - Reporter
     # - AssignedTo
+    # - Incident Status
     # - Title
     # - Summary
     # - Task Type
@@ -377,19 +434,24 @@ def create_incidents(event, context):
     # - Employee and user comments
     # - history tracking
 
-    incidents_table = str(os.environ['INCIDENTS_TABLE'])
+    incidents_table = 'incident-tickets-table-dev'
     db_client = boto3.resource('dynamodb')
     table = db_client.Table(incidents_table)
     incident_id = str(uuid.uuid4())
+    event_body = json.loads(event['body'])
 
-    user_email = event["request"]["userAttributes"]["email"]
-
+    # reporter_email = event["request"]["userAttributes"]["email"]
+    reporter_email = "gebahoc482@marikuza.com"
     try:
+        current_date = datetime.now()
+        iso_time_str = current_date.strftime('%Y-%m-%d %I:%M:%S %p')
+
         response = table.put_item(
             Item={
                 "incidentId": incident_id,
-                "reporter": user_email,
-                "assignedTo": ""
+                "reporterId": event_body['reporterId'],
+                "developerId": event_body['developerId'],
+                "timestamp": iso_time_str
             }
         )
     except ClientError as err:
@@ -403,7 +465,9 @@ def create_incidents(event, context):
     else:
         return build_resp(body={
             "incidentId": incident_id,
-            "reporter": user_email
+            "reporterId": event_body['reporterId'],
+            "developerId": event_body['developerId'],
+            "timestamp": iso_time_str
         })
 
 
@@ -492,7 +556,6 @@ def authorization(event, context):
     token = event['authorizationToken']
     client = boto3.client('cognito-idp')
     response = client.get_user(AccessToken=token)
-    # get user email for now --- TODO: will do uuid later
     principalId = response['UserAttributes'][0]['Value']
     emailId = response['UserAttributes'][2]['Value']
 
@@ -505,8 +568,7 @@ def authorization(event, context):
     client = boto3.resource('dynamodb')
     table = client.Table(user_table)
     response = table.get_item(Key={'userId': emailId})
-    # Add your rules to policy here
-    # example:
+
     print("principleId: ", principalId)
     print("emailId: ", emailId)
     print("table response: ", response)
