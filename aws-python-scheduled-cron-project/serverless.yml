@@ -98,8 +98,8 @@ functions:
           path: updatePermissions
           method: post
           cors: true
-          authorizer:
-            name: customAuthorizer
+          # authorizer:
+          #   name: customAuthorizer
   sendEmail:
     handler: handler.send_email
     events:
@@ -126,8 +126,8 @@ functions:
       - http:
           path: incident/all
           method: get
-          # authorizer:
-          #   name: customAuthorizer
+          authorizer:
+            name: customAuthorizer
           cors: true
 
   getIncidents:
@@ -136,8 +136,8 @@ functions:
       - http:
           path: incident/{id}
           method: get
-          # authorizer:
-          #   name: customAuthorizer
+          authorizer:
+            name: customAuthorizer
           cors: true
 
   getReporterIncidents:
@@ -146,8 +146,8 @@ functions:
       - http:
           path: incident/reporter/{id}
           method: get
-          # authorizer:
-          #   name: customAuthorizer
+          authorizer:
+            name: customAuthorizer
           cors: true
 
   getDeveloperIncidents:
@@ -156,8 +156,8 @@ functions:
       - http:
           path: incident/developer/{id}
           method: get
-          # authorizer:
-          #   name: customAuthorizer
+          authorizer:
+            name: customAuthorizer
           cors: true
 
   createIncidents:
@@ -166,8 +166,8 @@ functions:
       - http:
           path: incident
           method: post
-          # authorizer:
-          #   name: customAuthorizer
+          authorizer:
+            name: customAuthorizer
           cors: true
 
   getUserData:
@@ -176,8 +176,6 @@ functions:
       - http:
           path: user/{id}
           method: get
-          # authorizer:
-          #   name: customAuthorizer
           cors: true
 
   updateUserData:
@@ -186,8 +184,8 @@ functions:
       - http:
           path: user/{id}
           method: patch
-          # authorizer:
-          #   name: customAuthorizer
+          authorizer:
+            name: customAuthorizer
           cors: true
 
   updateIncidents:
@@ -196,8 +194,8 @@ functions:
       - http:
           path: incident/{id}
           method: patch
-          # authorizer:
-          #   name: customAuthorizer
+          authorizer:
+            name: customAuthorizer
           cors: true
 
   deleteIncidents:
@@ -206,8 +204,8 @@ functions:
       - http:
           path: incident/{id}
           method: delete
-          # authorizer:
-          #   name: customAuthorizer
+          authorizer:
+            name: customAuthorizer
           cors: true
 
   customAuthorizer:

@@ -66,7 +66,9 @@ def pre_sign_up(event, context):
             'incident': {
                 "allow": {
                     "/incident": "POST",
-                    f"/incident/reporter/{cognito_id}": "GET"
+                    "/user/*": "GET",
+                    f"/incident/reporter/{cognito_id}": "GET",
+                    f"/user/{cognito_id}": "PATCH"
                 }
             }
         }
@@ -175,6 +177,8 @@ def get_user_data(event, context):
             'userId': user_id
         })
 
+
+
     except ClientError as err:
         logger.error(
             "Couldn't get incident %s. Here's w2y: %s: %s",
@@ -193,6 +197,7 @@ def update_acl(event, context):
     print(event['body'])
     event_body = json.loads(event['body'])
     user_email = event_body['user_email']
+    user_id = event_body['user_id']
     user_acl = event_body['acl']
 
     try:
@@ -210,7 +215,7 @@ def update_acl(event, context):
 
         response = table.update_item(
             Key={
-                'userId': user_email
+                'userId': user_id
             },
             UpdateExpression=update_expression,
             ExpressionAttributeValues=updated_attrs,
@@ -238,7 +243,7 @@ def update_acl(event, context):
 
             response = table.update_item(
                 Key={
-                    'userId': user_email
+                    'userId': user_id
                 },
                 UpdateExpression=update_expression,
                 ExpressionAttributeValues=updated_attrs,
@@ -561,6 +566,9 @@ def create_incidents(event, context):
                 "timestamp": iso_time_str
             }
         )
+
+       
+
     except ClientError as err:
         logger.error(
             "Couldn't create incident. Here's why: 2%s: %s",
@@ -570,6 +578,48 @@ def create_incidents(event, context):
             "message": err.response['Error']['Message']
         })
     else:
+         # Update Reporter and Developer ACL
+       
+        if event_body['reporterId'] is not None:
+            user_table = str(os.environ['USERS_TABLE'])
+            table = db_client.Table(user_table)
+            reporter_id = event_body['reporterId']
+            response = table.get_item(Key={
+                'userId': reporter_id
+            })
+            print(response)
+
+            response['Item']['incident']['allow'][f'/incident/{incident_id}'] = 'GET'
+
+            response = table.update_item(
+                Key={'userId': reporter_id},
+                UpdateExpression="set incident.allow=:var1",
+                ExpressionAttributeValues={
+                    ":var1": response['Item']['incident']['allow']
+                },
+                ReturnValues="UPDATED_NEW"
+            )
+        
+        if event_body['developerId'] is not None:
+            user_table = str(os.environ['USERS_TABLE'])
+            table = db_client.Table(user_table)
+            developer_id = event_body['developerId']
+            response = table.get_item(Key={
+                'userId': developer_id
+            })
+            print(response)
+
+            response['Item']['incident']['allow'][f'/incident/{incident_id}'] = 'GET'
+            # TODO: add for post too
+            response = table.update_item(
+                Key={'userId': developer_id},
+                UpdateExpression="set incident.allow=:var1",
+                ExpressionAttributeValues={
+                    ":var1": response['Item']['incident']['allow']
+                },
+                ReturnValues="UPDATED_NEW"
+            )
+
         return build_resp(body={
             "incidentId": incident_id,
             "reporterId": event_body['reporterId'],
@@ -697,17 +747,18 @@ def authorization(event, context):
     user_table = str(os.environ['USERS_TABLE'])
     client = boto3.resource('dynamodb')
     table = client.Table(user_table)
-    response = table.get_item(Key={'userId': emailId})
+    response = table.get_item(Key={'userId': principalId})
 
     print("principleId: ", principalId)
     print("emailId: ", emailId)
     print("table response: ", response)
 
-    available_endpoints = ['incident', 'updatePermissions']
+    available_endpoints = ['incident', 'user', 'updatePermissions']
 
     for endpoint in available_endpoints:
-        for k, v in response['Item'][endpoint]['allow'].items():
-            policy.allowMethod(v, k)
+        if endpoint in response['Item']:
+            for k, v in response['Item'][endpoint]['allow'].items():
+                policy.allowMethod(v, k)
 
     # Build policy
     authResponse = policy.build()
