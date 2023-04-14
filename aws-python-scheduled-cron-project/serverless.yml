@@ -192,7 +192,7 @@ functions:
     handler: handler.update_incidents
     events:
       - http:
-          path: incident/{id}
+          path: incident/update/{id}
           method: patch
           authorizer:
             name: customAuthorizer

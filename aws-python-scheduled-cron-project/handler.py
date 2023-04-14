@@ -63,12 +63,14 @@ def pre_sign_up(event, context):
             'name': "",
             "createdAt": iso_time_str,
             'summary': "",
+            "user": {
+                "/user/*": "GET",
+                f"/user/{cognito_id}": "PATCH"
+            },
             'incident': {
                 "allow": {
                     "/incident": "POST",
-                    "/user/*": "GET",
                     f"/incident/reporter/{cognito_id}": "GET",
-                    f"/user/{cognito_id}": "PATCH"
                 }
             }
         }
@@ -176,8 +178,6 @@ def get_user_data(event, context):
         response = table.get_item(Key={
             'userId': user_id
         })
-
-
 
     except ClientError as err:
         logger.error(
@@ -567,8 +567,6 @@ def create_incidents(event, context):
             }
         )
 
-       
-
     except ClientError as err:
         logger.error(
             "Couldn't create incident. Here's why: 2%s: %s",
@@ -578,8 +576,8 @@ def create_incidents(event, context):
             "message": err.response['Error']['Message']
         })
     else:
-         # Update Reporter and Developer ACL
-       
+        # Update Reporter and Developer ACL
+
         if event_body['reporterId'] is not None:
             user_table = str(os.environ['USERS_TABLE'])
             table = db_client.Table(user_table)
@@ -590,6 +588,7 @@ def create_incidents(event, context):
             print(response)
 
             response['Item']['incident']['allow'][f'/incident/{incident_id}'] = 'GET'
+            response['Item']['incident']['allow'][f'/incident/update/{incident_id}'] = 'PATCH'
 
             response = table.update_item(
                 Key={'userId': reporter_id},
@@ -599,7 +598,7 @@ def create_incidents(event, context):
                 },
                 ReturnValues="UPDATED_NEW"
             )
-        
+
         if event_body['developerId'] is not None:
             user_table = str(os.environ['USERS_TABLE'])
             table = db_client.Table(user_table)
@@ -610,7 +609,8 @@ def create_incidents(event, context):
             print(response)
 
             response['Item']['incident']['allow'][f'/incident/{incident_id}'] = 'GET'
-            # TODO: add for post too
+            response['Item']['incident']['allow'][f'/incident/update/{incident_id}'] = 'PATCH'
+
             response = table.update_item(
                 Key={'userId': developer_id},
                 UpdateExpression="set incident.allow=:var1",
@@ -635,6 +635,8 @@ def update_incidents(event, context):
     incident_id = event['pathParameters']['id']
 
     request_body = json.loads(event['body'])
+
+    # TODO: add update to new developer access
 
     try:
 
@@ -706,8 +708,49 @@ def update_incidents(event, context):
 
         # generic_send_email(sender="kshitijkumar.atom@gmail.com",
         #                    subject=f"INCIDENT {incident_id}", body_html=create_email_body(f"INCIDENT {incident_id} updated"), recipients=recipients)
+        incident_resp = response
+        if request_body['reporterId'] is not None:
+            user_table = str(os.environ['USERS_TABLE'])
+            table = db_client.Table(user_table)
+            reporter_id = request_body['reporterId']
+            response = table.get_item(Key={
+                'userId': reporter_id
+            })
+            print(response)
 
-        return build_resp(body=response['Attributes'])
+            response['Item']['incident']['allow'][f'/incident/{incident_id}'] = 'GET'
+            response['Item']['incident']['allow'][f'/incident/update/{incident_id}'] = 'PATCH'
+
+            response = table.update_item(
+                Key={'userId': reporter_id},
+                UpdateExpression="set incident.allow=:var1",
+                ExpressionAttributeValues={
+                    ":var1": response['Item']['incident']['allow']
+                },
+                ReturnValues="UPDATED_NEW"
+            )
+
+        if request_body['developerId'] is not None:
+            user_table = str(os.environ['USERS_TABLE'])
+            table = db_client.Table(user_table)
+            developer_id = request_body['developerId']
+            response = table.get_item(Key={
+                'userId': developer_id
+            })
+            print(response)
+
+            response['Item']['incident']['allow'][f'/incident/{incident_id}'] = 'GET'
+            response['Item']['incident']['allow'][f'/incident/update/{incident_id}'] = 'PATCH'
+
+            response = table.update_item(
+                Key={'userId': developer_id},
+                UpdateExpression="set incident.allow=:var1",
+                ExpressionAttributeValues={
+                    ":var1": response['Item']['incident']['allow']
+                },
+                ReturnValues="UPDATED_NEW"
+            )
+        return build_resp(body=incident_resp['Attributes'])
 
 
 def delete_incidents(event, context):
