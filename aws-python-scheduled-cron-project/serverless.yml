@@ -140,8 +140,6 @@ functions:
           #   name: customAuthorizer
           cors: true
 
-  
-
   getReporterIncidents:
     handler: handler.get_reporter_incidents
     events:
@@ -168,6 +166,26 @@ functions:
       - http:
           path: incident
           method: post
+          # authorizer:
+          #   name: customAuthorizer
+          cors: true
+
+  getUserData:
+    handler: handler.get_user_data
+    events:
+      - http:
+          path: user/{id}
+          method: get
+          # authorizer:
+          #   name: customAuthorizer
+          cors: true
+
+  updateUserData:
+    handler: handler.update_user_data
+    events:
+      - http:
+          path: user/{id}
+          method: patch
           # authorizer:
           #   name: customAuthorizer
           cors: true

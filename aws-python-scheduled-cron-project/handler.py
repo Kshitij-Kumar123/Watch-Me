@@ -48,14 +48,17 @@ def pre_sign_up(event, context):
     table = db_client.Table(user_table)
 
     user_email = event["request"]["userAttributes"]["email"]
-    current_date = datetime.now()
+    cognito_id = event["request"]["userAttributes"]["sub"]
 
+    current_date = datetime.now()
     iso_time_str = current_date.strftime('%Y-%m-%dT%H:%M:%S.%f%z')
+
+    print(event)
 
     response = table.put_item(
         Item={
-            'userId': user_email,
-            'userCognitoId': '',  # temp
+            'userId': cognito_id,
+            'userEmail': user_email,  # temp
             'role': 'customer',
             'name': "",
             "createdAt": iso_time_str,
@@ -63,7 +66,7 @@ def pre_sign_up(event, context):
             'incident': {
                 "allow": {
                     "/incident": "POST",
-                    f"/incident/reporter/{user_email}": "GET"
+                    f"/incident/reporter/{cognito_id}": "GET"
                 }
             }
         }
@@ -73,7 +76,115 @@ def pre_sign_up(event, context):
 
     return event
 
+# TODO: user endpoint for getting and changing own data
+
+
+def update_user_data(event, context):
+    user_table = str(os.environ['USERS_TABLE'])
+
+    db_client = boto3.resource('dynamodb')
+    table = db_client.Table(user_table)
+    user_id = event['pathParameters']['id']
+
+    request_body = json.loads(event['body'])
+
+    try:
+
+        update_expression = "set "
+        updated_attrs = {}
+        count = 1
+        last_key = list(request_body)[-1]
+
+        for key, value in request_body.items():
+            update_expression += f"info.{key}=:var{count}"
+            updated_attrs[f':var{count}'] = value
+            if key != last_key:
+                update_expression += ", "
+            count += 1
+
+        print(update_expression)
+        print(updated_attrs)
+
+        response = table.update_item(
+            Key={'userId': user_id},
+            UpdateExpression=update_expression,
+            ExpressionAttributeValues=updated_attrs,
+            ReturnValues="UPDATED_NEW"
+        )
+
+    except ClientError as err:
+        if err.response['Error']['Code'] == 'ValidationException':
+            update_expression = "set "
+            expression_attr_names = {}
+            updated_attrs = {}
+            count = 1
+            last_key = list(request_body)[-1]
+
+            for key, value in request_body.items():
+                update_expression += f"#src{count}=:v{count}"
+                updated_attrs[f':v{count}'] = value
+                expression_attr_names[f"#src{count}"] = key
+
+                if key != last_key:
+                    update_expression += ", "
+                count += 1
+
+            print(update_expression)
+            print(updated_attrs)
+            print(expression_attr_names)
+
+            response = table.update_item(
+                Key={'userId': user_id},
+                UpdateExpression=update_expression,
+                ExpressionAttributeValues=updated_attrs,
+                ExpressionAttributeNames=expression_attr_names,
+                ReturnValues="UPDATED_NEW"
+            )
+
+            # recipients = [request_body['reporter'], request_body['assignedTo']]
+            # TODO: Email address is not verified. The following identities failed the check in region US-EAST-1:
+
+            # generic_send_email(sender="kshitijkumar.atom@gmail.com",
+            #                    subject=f"INCIDENT {incident_id}", body_html=create_email_body(f"INCIDENT {incident_id} updated by {request_body['assignedTo']}"), recipients=recipients)
+            return build_resp(body=response['Attributes'])
+
+        logger.error(
+            "Couldn't update incident %s. Here's wh2y: %s: %s",
+            user_id,
+            err.response['Error']['Code'], err.response['Error']['Message'])
+    else:
+        # send email about update
+        # recipients = [request_body['reporter'], request_body['assignedTo']]
+
+        # generic_send_email(sender="kshitijkumar.atom@gmail.com",
+        #                    subject=f"INCIDENT {incident_id}", body_html=create_email_body(f"INCIDENT {incident_id} updated"), recipients=recipients)
+
+        return build_resp(body=response['Attributes'])
+
+
 # Needs to be an admin only endpoint
+def get_user_data(event, context):
+    user_table = str(os.environ['USERS_TABLE'])
+
+    db_client = boto3.resource('dynamodb')
+    table = db_client.Table(user_table)
+    user_id = event['pathParameters']['id']
+
+    try:
+        response = table.get_item(Key={
+            'userId': user_id
+        })
+
+    except ClientError as err:
+        logger.error(
+            "Couldn't get incident %s. Here's w2y: %s: %s",
+            user_id,
+            err.response['Error']['Code'], err.response['Error']['Message'])
+
+        return build_resp(body=err.response['Error']['Message'], status_code=err.response['Error']['Code'])
+    else:
+        item = response['Item']
+        return build_resp(body=item)
 
 
 def update_acl(event, context):
@@ -83,9 +194,6 @@ def update_acl(event, context):
     event_body = json.loads(event['body'])
     user_email = event_body['user_email']
     user_acl = event_body['acl']
-
-    print('user_email: ', user_email)
-    print('user_acl: ', user_acl)
 
     try:
         update_expression = "set "
@@ -322,6 +430,7 @@ def send_email(event, context):
         print(response['MessageId'])
         return build_resp(body={"message": f"Message successfully sent. {response['MessageId']}"})
 
+
 def get_all_incidents(event, context):
     incidents_table = 'incident-tickets-table3-dev'
     db_client = boto3.resource('dynamodb')
@@ -329,7 +438,7 @@ def get_all_incidents(event, context):
 
     response = table.scan()
     data = response['Items']
-    
+
     return build_resp(body=data)
 
 
