@@ -12,6 +12,14 @@ from boto3.dynamodb.conditions import Key
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+# TODO: push API and frontend to Prod
+# TODO: add pictures and files to incidents
+# TODO: Clean up files + CI/CD
+
+# TODO: push SES to prod for emails: Remove Quotes email and create insights
+
+# TODO: ChatGPT integration
+
 # Format response in JSON
 
 
@@ -31,7 +39,6 @@ def build_resp(body, status_code=200, content_type="application/json"):
 
 def pre_sign_up(event, context):
     # Adds new signed up user to database
-    # Default Role should be consumer - allowed to make new incidents and view their own incidents
 
     # User attrs
     # - user email
@@ -41,7 +48,7 @@ def pre_sign_up(event, context):
     # - date created
     # - summary
     # - specialization
-    # - applicable ACLs -- seperate table? Not needed probably
+    # - applicable ACLs
 
     user_table = str(os.environ['USERS_TABLE'])
     db_client = boto3.resource('dynamodb')
@@ -79,8 +86,6 @@ def pre_sign_up(event, context):
     # TODO: Send email for confirmation and greeting
 
     return event
-
-# TODO: user endpoint for getting and changing own data
 
 
 def update_user_data(event, context):
@@ -636,8 +641,6 @@ def update_incidents(event, context):
 
     request_body = json.loads(event['body'])
 
-    # TODO: add update to new developer access
-
     try:
 
         update_expression = "set "
@@ -704,31 +707,11 @@ def update_incidents(event, context):
             err.response['Error']['Code'], err.response['Error']['Message'])
     else:
         # send email about update
-        recipients = [request_body['reporter'], request_body['assignedTo']]
+        # recipients = [request_body['reporter'], request_body['assignedTo']]
 
         # generic_send_email(sender="kshitijkumar.atom@gmail.com",
         #                    subject=f"INCIDENT {incident_id}", body_html=create_email_body(f"INCIDENT {incident_id} updated"), recipients=recipients)
         incident_resp = response
-        if request_body['reporterId'] is not None:
-            user_table = str(os.environ['USERS_TABLE'])
-            table = db_client.Table(user_table)
-            reporter_id = request_body['reporterId']
-            response = table.get_item(Key={
-                'userId': reporter_id
-            })
-            print(response)
-
-            response['Item']['incident']['allow'][f'/incident/{incident_id}'] = 'GET'
-            response['Item']['incident']['allow'][f'/incident/update/{incident_id}'] = 'PATCH'
-
-            response = table.update_item(
-                Key={'userId': reporter_id},
-                UpdateExpression="set incident.allow=:var1",
-                ExpressionAttributeValues={
-                    ":var1": response['Item']['incident']['allow']
-                },
-                ReturnValues="UPDATED_NEW"
-            )
 
         if request_body['developerId'] is not None:
             user_table = str(os.environ['USERS_TABLE'])
