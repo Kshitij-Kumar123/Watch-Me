@@ -10,16 +10,12 @@ export const Navbar = ({ user, signOut, username }) => {
   const items = [
     {
       key: "1",
-      danger: true,
-      label: <div onClick={signOut}>Sign Out</div>,
+      label: <Link to={`/user/${userId}`}>Change User Details</Link>,
     },
     {
       key: "2",
-      label: "Notifications",
-    },
-    {
-      key: "3",
-      label: <Link to={`/user/${userId}`}>Change User Details</Link>,
+      danger: true,
+      label: <div onClick={signOut}>Sign Out</div>,
     },
   ];
 
