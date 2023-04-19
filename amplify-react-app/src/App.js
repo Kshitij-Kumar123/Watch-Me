@@ -3,8 +3,8 @@ import React, { useState, useEffect } from "react";
 import { Authenticator } from "@aws-amplify/ui-react";
 import "@aws-amplify/ui-react/styles.css";
 import awsExports from "./aws-exports";
-import { fetchQuote, fetchAuthSession, fetchIncident } from "./ApiCalls";
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import { AxiosInterceptorsSetup } from "./ApiCalls";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { Layout } from "antd";
 import { Navbar } from "./components/Navbar";
 import HomePage from "./components/HomePage";
@@ -18,18 +18,18 @@ Amplify.configure(awsExports);
 
 const { Header, Content, Footer } = Layout;
 
-export default function App() {
-  useEffect(() => {
-    // fetchQuote().then((value) => console.log(value));
-    // fetchQuote().then((value) => console.log("quote: ", value));
-    // fetchIncident().then((value) => console.log("fetchIncident: ", value));
-    // fetchAuthSession().then((data) => console.log(data));
-  }, []);
+function AxiosInterceptorNavigate() {
+  let navigate = useNavigate();
+  AxiosInterceptorsSetup(navigate);
+  return <></>;
+}
 
+export default function App() {
   return (
     <Authenticator>
       {({ signOut, user }) => (
         <BrowserRouter>
+          {<AxiosInterceptorNavigate />}
           <Layout className="layout">
             <Navbar
               user={user}
