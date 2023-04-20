@@ -26,7 +26,7 @@ export const Navbar = ({ user, signOut, username }) => {
     },
     {
       key: "2",
-      label: <Link to={"/incident"}>Incidents</Link>,
+      label: <Link to={"/incident/user"}>Incidents</Link>,
     },
     {
       key: "3",

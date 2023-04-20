@@ -1,6 +1,6 @@
 import { Auth } from "aws-amplify";
 import axios from "axios";
-import { useRouter } from "react-router";
+import { notification } from "antd";
 
 const fetchAuthSession = async () => {
   const currentSession = await Auth.currentSession();
@@ -28,9 +28,16 @@ export const AxiosInterceptorsSetup = (navigate) => {
       return response;
     },
     function (error) {
-      if (error.response.status !== 200) {
+      if (error.response.status === 401) {
         navigate("/error");
+        return Promise.reject(error);
       }
+      notification.info({
+        message: `Error ${error.response.status}: `,
+        duration: 300,
+        description: "",
+      });
+
       return Promise.reject(error);
     }
   );
@@ -42,6 +49,13 @@ export const fetchQuote = async () => {
   return quotesResponse;
 };
 
+export const fetchUserIncidents = async () => {
+  const { accessToken } = await fetchAuthSession();
+  const { username } = accessToken.payload;
+  const response = await client.get(`/incident/reporter/${username}`);
+  return response.data;
+};
+
 export const fetchAllIncidents = async () => {
   const response = await client.get(`/incident/all`);
   return response.json();
@@ -50,25 +64,23 @@ export const fetchAllIncidents = async () => {
 export const fetchIncident = async () => {
   const { accessToken } = await fetchAuthSession();
   const { jwtToken } = accessToken;
-  console.log(accessToken);
-  const response = await fetch(
-    `${process.env.REACT_APP_URL_DEV}user/2dc608dd-c9ea-47d7-bd50-f8a282c24362`,
-    {
-      mode: "cors",
-      method: "GET",
-      // body: JSON.stringify({
-      //     // "developerId": "2dc608dd-c9ea-47d7-bd50-f8a282c24362",
-      //     // "reporterId": "2dc608dd-c9ea-47d7-bd50-f8a282c24362",
-      //     // "timestamp": "2023-04-13 04:53:36 PM",
-      //     // "summary": "second placeholder",
-      //     // "title": "well, this is a title placeholder of something"
-      //     "summary": "jedi master"
-      // }),
-      headers: {
-        Authorization: jwtToken,
-      },
-    }
-  );
-  const incidentResponse = await response.json();
-  return incidentResponse;
+};
+
+export const createIncident = async (form) => {
+  const { accessToken } = await fetchAuthSession();
+  const { username } = accessToken.payload;
+  // TODO: add comments, start and end date later
+  const response = await client.post(`/incident`, {
+    incidentStatus: "New",
+    title: form.getFieldValue("title"),
+    summary: form.getFieldValue("description"),
+    taskType: form.getFieldValue("requestType"),
+    complexityRating: form.getFieldValue("complexityRating"),
+    subCategory: form.getFieldValue("subCategory"),
+    reporterId: username,
+    developerId: username,
+    // comments: [form.getFieldValue("comment")],
+  });
+
+  return response.json();
 };

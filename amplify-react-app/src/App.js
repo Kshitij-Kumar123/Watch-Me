@@ -42,7 +42,7 @@ export default function App() {
                   path="/"
                   element={<HomePage signOut={() => signOut()} user={user} />}
                 />
-                <Route path="/incident" element={<IncidentHomePage />} />
+                <Route path="/incident/user" element={<IncidentHomePage />} />
                 <Route path="/incident/:id" element={<IncidentDetails />} />
                 <Route path="/user/:id" element={<UserDetails />} />
                 <Route path="/user/admin" element={<AdminControl />} />

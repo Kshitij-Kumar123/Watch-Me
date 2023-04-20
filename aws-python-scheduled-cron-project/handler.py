@@ -493,8 +493,9 @@ def get_reporter_incidents(event, context):
             "Couldn't get incident for user %s. 2Here's why: %s: %s",
             reporter_id,
             err.response['Error']['Code'], err.response['Error']['Message'])
-
-        return build_resp(body=err.response['Error'], status_code=err.response['Error']['Code'])
+        return build_resp(status_code=err.response['ResponseMetadata']['HTTPStatusCode'], body={
+            "message": f"{err.response['Error']['Code']}: {err.response['Error']['Message']}"
+        })
     else:
         item = response['Items']
         return build_resp(body=item)
@@ -559,6 +560,8 @@ def create_incidents(event, context):
     incident_id = str(uuid.uuid4())
     event_body = json.loads(event['body'])
 
+    # TODO: update request body params
+
     try:
         current_date = datetime.now()
         iso_time_str = current_date.strftime('%Y-%m-%d %I:%M:%S %p')
@@ -573,12 +576,14 @@ def create_incidents(event, context):
         )
 
     except ClientError as err:
+        # TODO: fix the error message back
+        print('this is error message: ', err.response)
         logger.error(
             "Couldn't create incident. Here's why: 2%s: %s",
             err.response['Error']['Code'], err.response['Error']['Message'])
 
-        return build_resp(status_code=err.response['Error']['Code'], body={
-            "message": err.response['Error']['Message']
+        return build_resp(status_code=err.response['ResponseMetadata']['HTTPStatusCode'], body={
+            "message": f"{err.response['Error']['Code']}: {err.response['Error']['Message']}"
         })
     else:
         # Update Reporter and Developer ACL
