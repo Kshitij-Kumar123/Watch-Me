@@ -61,9 +61,9 @@ export const fetchAllIncidents = async () => {
   return response.json();
 };
 
-export const fetchIncident = async () => {
-  const { accessToken } = await fetchAuthSession();
-  const { jwtToken } = accessToken;
+export const fetchIncident = async (incidentId) => {
+  const response = await client.get(`/incident/${incidentId}`);
+  return response;
 };
 
 export const createIncident = async (form) => {
