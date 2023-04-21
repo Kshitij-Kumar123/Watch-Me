@@ -4,6 +4,7 @@
   "private": true,
   "proxy": "https://zcifwtq6ye.execute-api.us-east-1.amazonaws.com",
   "dependencies": {
+    "@ant-design/compatible": "^5.1.1",
     "@aws-amplify/ui-react": "^4.4.3",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
