@@ -56,6 +56,13 @@ export const fetchUserIncidents = async () => {
   return response.data;
 };
 
+export const fetchCurrentUserDetails = async () => {
+  const { accessToken } = await fetchAuthSession();
+  const username = accessToken.payload.username;
+  const response = await client.get(`/user/${username}`);
+  return response;
+};
+
 export const fetchAllIncidents = async () => {
   const response = await client.get(`/incident/all`);
   return response.json();

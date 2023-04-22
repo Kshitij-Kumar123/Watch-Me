@@ -24,6 +24,9 @@ function AxiosInterceptorNavigate() {
   return <></>;
 }
 
+// TODO: figure out Login URL changes
+// figure out getting user data from db
+
 export default function App() {
   return (
     <Authenticator>

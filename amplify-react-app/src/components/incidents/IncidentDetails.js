@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { useParams } from "react-router";
 import { fetchIncident } from "../../ApiCalls";
 import {
@@ -15,6 +15,7 @@ import {
   Tooltip,
 } from "antd";
 import { Comment } from "@ant-design/compatible";
+import { UserContext } from "../../context/UserContext";
 
 const { RangePicker } = DatePicker;
 
@@ -23,11 +24,16 @@ export default function IncidentDetails() {
   const [incidentData, setIncidentData] = useState({});
   const { TextArea } = Input;
 
+  const { userData } = useContext(UserContext);
+  console.log(userData);
+
   useEffect(() => {
     fetchIncident(params.id).then((response) => {
+      console.log(response.data);
       setIncidentData(response.data);
     });
   }, []);
+
   const data = [
     {
       actions: [<span key="comment-list-reply-to-0">Reply to</span>],
