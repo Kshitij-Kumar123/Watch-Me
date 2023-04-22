@@ -1,12 +1,56 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useContext, useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Avatar, Dropdown, Menu, Space, Layout } from "antd";
 import { UserOutlined } from "@ant-design/icons";
+import { UserContext } from "../context/UserContext";
 
 const { Header } = Layout;
 
 export const Navbar = ({ user, signOut, username }) => {
+  const [navbarItems, setNavbarItems] = useState([]);
+  const [selectedMenu, setSelectedMenu] = useState("1");
+  const { userData } = useContext(UserContext);
   const userId = user.attributes.sub;
+  const location = useLocation();
+
+  useEffect(() => {
+    let key = "1";
+    console.log(location.pathname);
+    if (location.pathname === "/") {
+      key = "1";
+    } else if (location.pathname === "/incident/user") {
+      key = "2";
+    } else if (location.pathname === "/admin") {
+      key = "3";
+    } else if (location.pathname.includes("user")) {
+      key = "0";
+    }
+
+    setSelectedMenu(key);
+  }, [location]);
+
+  useEffect(() => {
+    const navbar = [
+      {
+        key: "1",
+        label: <Link to={"/"}>Create Requests</Link>,
+      },
+      {
+        key: "2",
+        label: <Link to={"/incident/user"}>Incidents</Link>,
+      },
+    ];
+
+    if (userData.role?.toLowerCase().trim() === "admin") {
+      navbar.push({
+        key: "3",
+        label: <Link to={"/user/admin"}>Admin</Link>,
+      });
+    }
+
+    setNavbarItems(navbar);
+  }, []);
+
   const items = [
     {
       key: "1",
@@ -19,20 +63,6 @@ export const Navbar = ({ user, signOut, username }) => {
     },
   ];
 
-  const navbarItems = [
-    {
-      key: "1",
-      label: <Link to={"/"}>Create Requests</Link>,
-    },
-    {
-      key: "2",
-      label: <Link to={"/incident/user"}>Incidents</Link>,
-    },
-    {
-      key: "3",
-      label: <Link to={"/user/admin"}>Admin</Link>,
-    },
-  ];
   return (
     <Header style={{ position: "sticky", top: 0, zIndex: 1, width: "100%" }}>
       <div style={{ float: "right" }}>
@@ -52,7 +82,7 @@ export const Navbar = ({ user, signOut, username }) => {
       <Menu
         theme="dark"
         mode="horizontal"
-        defaultSelectedKeys={["2"]}
+        selectedKeys={[selectedMenu]}
         items={navbarItems}
       />
     </Header>
