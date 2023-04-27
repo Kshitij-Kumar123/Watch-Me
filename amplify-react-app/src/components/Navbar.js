@@ -22,7 +22,7 @@ export const Navbar = ({ user, signOut, username }) => {
       key = "2";
     } else if (location.pathname === "/admin") {
       key = "3";
-    } else if (location.pathname.includes("user")) {
+    } else {
       key = "0";
     }
 

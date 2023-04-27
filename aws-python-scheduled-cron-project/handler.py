@@ -66,13 +66,15 @@ def pre_sign_up(event, context):
         Item={
             'userId': cognito_id,
             'userEmail': user_email,  # temp
-            'role': 'customer',
+            'userRole': 'customer',  # should be userRole
             'name': "",
             "createdAt": iso_time_str,
             'summary': "",
             "user": {
-                "/user/*": "GET",
-                f"/user/{cognito_id}": "PATCH"
+                "allow": {
+                    "/user/*": "GET",
+                    f"/user/{cognito_id}": "PATCH"
+                }
             },
             'incident': {
                 "allow": {
@@ -201,14 +203,66 @@ def update_acl(event, context):
     table = boto3.resource('dynamodb').Table(user_table)
     print(event['body'])
     event_body = json.loads(event['body'])
-    user_email = event_body['user_email']
-    user_id = event_body['user_id']
-    user_acl = event_body['acl']
+    user_email = event_body['userEmail']
+    user_id = event_body['userId']
+    user_acl = {}
+
+    selected_user_role = event_body['role'].lower()
+    # TODO: figure out role changes in DB
+
+    if selected_user_role == "admin":
+        if not "updatePermissions" in user_acl:
+            user_acl['updatePermissions'] = {}
+
+        if not 'incident' in user_acl:
+            user_acl['incident'] = {}
+
+        user_acl['updatePermissions'] = {
+            "/updatePermissions": "POST",
+        }
+
+        user_acl['incident'] = {
+            "/incident": "POST",
+            "/incident/all": "GET",
+            "/incident/*": "GET",
+            f"/incident/reporter/*": "GET",
+            f"/incident/developer/*": "GET",
+            "/incident/update/*": "PATCH"
+        }
+
+    elif selected_user_role == "developer":
+        if not 'incident' in user_acl:
+            user_acl['incident'] = {}
+
+        if not "updatePermissions" in user_acl:
+            user_acl['updatePermissions'] = {}
+
+        # user_acl['updatePermissions'] = {}
+        user_acl['updatePermissions'] = {
+            "/updatePermissions": "POST",
+        }
+
+        user_acl["incident"] = {
+            "/incident": "POST",
+            "/incident/all": "GET",
+            "/incident/*": "GET",
+            f"/incident/reporter/*": "GET",
+            f"/incident/developer/{user_id}": "GET",
+        }
+
+    print("acl: ", user_acl)
 
     try:
-        update_expression = "set "
-        updated_attrs = {}
+        update_expression = "set info.userRole=:var0, "
+        updated_attrs = {
+            ':var0': selected_user_role
+        }
+        print("first if condition")
+
+        # update_expression = "set "
+        # updated_attrs = {}
         count = 1
+
         last_key = list(user_acl)[-1]
 
         for key, value in user_acl.items():
@@ -229,9 +283,19 @@ def update_acl(event, context):
     except ClientError as err:
 
         if err.response['Error']['Code'] == 'ValidationException':
-            update_expression = "set "
-            expression_names = {}
-            updated_attrs = {}
+            update_expression = "set #src0=:var0, "
+            expression_names = {
+                "#src0": "userRole"
+            }
+            updated_attrs = {
+                ":var0": selected_user_role
+            }
+            print("other if condition")
+
+            # update_expression = "set "
+            # expression_names = {}
+            # updated_attrs = {}
+
             count = 1
             last_key = list(user_acl)[-1]
             for key, value in user_acl.items():
@@ -261,8 +325,9 @@ def update_acl(event, context):
                 user_email,
                 err.response['Error']['Code'], err.response['Error']['Message'])
 
-            return build_resp(body=response['Attributes'])
-
+        return build_resp(status_code=200, body={
+            "message": f"{err.response['Error']['Code']}: {err.response['Error']['Message']}"
+        })
     else:
         return build_resp(body=response['Attributes'])
 
@@ -548,6 +613,7 @@ def create_incidents(event, context):
     # - Title
     # - Summary
     # - Task Type
+    # - task sub category type
     # - Attachments or Images
     # - Start and End date
     # - complexity rating + time put in

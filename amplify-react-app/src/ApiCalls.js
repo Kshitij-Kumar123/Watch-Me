@@ -25,19 +25,21 @@ client.interceptors.request.use(async (config) => {
 export const AxiosInterceptorsSetup = (navigate) => {
   client.interceptors.response.use(
     (response) => {
+      if (response.data.status === 200) {
+        notification.info({
+          message: `Activity done`,
+          duration: 300,
+          description: "",
+        });
+      }
       return response;
     },
     function (error) {
+      console.log(error);
       if (error.response.status === 401) {
         navigate("/error");
         return Promise.reject(error);
       }
-      notification.info({
-        message: `Error ${error.response.status}: `,
-        duration: 300,
-        description: "",
-      });
-
       return Promise.reject(error);
     }
   );
@@ -63,6 +65,11 @@ export const fetchCurrentUserDetails = async () => {
   return response;
 };
 
+export const fetchUserDetails = async (userId) => {
+  const response = await client.get(`/user/${userId}`);
+  return response;
+};
+
 export const fetchAllIncidents = async () => {
   const response = await client.get(`/incident/all`);
   return response.json();
@@ -70,6 +77,15 @@ export const fetchAllIncidents = async () => {
 
 export const fetchIncident = async (incidentId) => {
   const response = await client.get(`/incident/${incidentId}`);
+  return response;
+};
+
+export const updatePermissions = async (values) => {
+  const response = await client.post(`/updatePermissions`, {
+    userEmail: values.userEmail,
+    userId: values.userId,
+    role: values.role,
+  });
   return response;
 };
 
