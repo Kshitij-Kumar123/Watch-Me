@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import {
   Button,
@@ -28,62 +28,57 @@ const normFile = (e) => {
   return e?.fileList;
 };
 
-const IncidentForm = ({ form, requestType }) => {
+const IncidentForm = ({ form }) => {
   return (
-    <>
-      <Form
-        labelCol={{ span: 5 }}
-        wrapperCol={{ span: 18 }}
-        layout="horizontal"
-        form={form}
-        style={{ maxWidth: 600, padding: "16px 0px" }}
+    <Form
+      labelCol={{ span: 5 }}
+      wrapperCol={{ span: 18 }}
+      layout="horizontal"
+      form={form}
+      style={{ maxWidth: 600, padding: "16px 0px" }}
+    >
+      <Form.Item label="Incident Title" name="title">
+        <Input />
+      </Form.Item>
+      <Form.Item label="Sub Category" name="subCategory">
+        <Select>
+          <Select.Option value="demo">Demo</Select.Option>
+        </Select>
+      </Form.Item>
+      <Form.Item label="RangePicker" name="dateRange">
+        <RangePicker />
+      </Form.Item>
+      <Form.Item label="Complexity" name="complexity">
+        <InputNumber />
+      </Form.Item>
+      <Form.Item label="Description" name="description">
+        <TextArea rows={4} />
+      </Form.Item>
+      <Form.Item label="Comments" name="comment">
+        <TextArea rows={4} />
+      </Form.Item>
+      <Form.Item
+        label="Upload"
+        valuePropName="fileList"
+        name="file"
+        getValueFromEvent={normFile}
       >
-        <Form.Item label="Request Type" name="requestType">
-          <Input value={requestType} />
-        </Form.Item>
-        <Form.Item label="Incident Title" name="title">
-          <Input />
-        </Form.Item>
-        <Form.Item label="Sub Category" name="subCategory">
-          <Select>
-            <Select.Option value="demo">Demo</Select.Option>
-          </Select>
-        </Form.Item>
-        <Form.Item label="RangePicker" name="dateRange">
-          <RangePicker />
-        </Form.Item>
-        <Form.Item label="Complexity" name="complexity">
-          <InputNumber />
-        </Form.Item>
-        <Form.Item label="Description" name="description">
-          <TextArea rows={4} />
-        </Form.Item>
-        <Form.Item label="Comments" name="comment">
-          <TextArea rows={4} />
-        </Form.Item>
-        <Form.Item
-          label="Upload"
-          valuePropName="fileList"
-          name="file"
-          getValueFromEvent={normFile}
-        >
-          <Upload action="/upload.do" listType="picture-card">
-            <div>
-              <PlusOutlined />
-              <div style={{ marginTop: 8 }}>Upload</div>
-            </div>
-          </Upload>
-        </Form.Item>
-      </Form>
-    </>
+        <Upload action="/upload.do" listType="picture-card">
+          <div>
+            <PlusOutlined />
+            <div style={{ marginTop: 8 }}>Upload</div>
+          </div>
+        </Upload>
+      </Form.Item>
+    </Form>
   );
 };
 export default function HomePage({ user, signOut }) {
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
 
-  const submitRequests = async (key) => {
-    form.setFieldValue({ requestType: key });
+  const submitRequests = async (requestType) => {
+    form.setFieldValue({ requestType: requestType });
     createIncident(form).then(() => {
       setOpen(false);
       notification.info({
@@ -140,27 +135,27 @@ export default function HomePage({ user, signOut }) {
                   {value.description}
                 </div>
                 <Modal
-                  title="Create Request"
+                  title={`Create Request: ${value.key}`}
                   open={open}
                   onOk={() => submitRequests(value.key)}
                   onCancel={clearForm}
                   okText="Create"
                   cancelText="Cancel"
                 >
-                  <IncidentForm form={form} requestType={value.key} />
+                  <IncidentForm form={form} />
                 </Modal>
               </Card>
             </Col>
           );
         })}
       </Row>
-      <Row style={{ margin: "16px 0px" }}>
+      {/* <Row style={{ margin: "16px 0px" }}>
         <Col span={24}>
           <Card title={"Something"} bordered={false}>
             Hello this is some description
           </Card>
         </Col>
-      </Row>
+      </Row> */}
     </div>
   );
 }

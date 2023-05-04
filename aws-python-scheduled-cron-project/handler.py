@@ -518,14 +518,26 @@ def get_all_incidents(event, context):
 
 
 def get_incidents(event, context):
-    incidents_table = 'incident-tickets-table3-dev'
     db_client = boto3.resource('dynamodb')
-    table = db_client.Table(incidents_table)
     incident_id = event['pathParameters']['id']
 
     try:
-        response = table.get_item(Key={
+        incidents_table = 'incident-tickets-table3-dev'
+        table = db_client.Table(incidents_table)
+
+        incident_response = table.get_item(Key={
             'incidentId': incident_id
+        })
+
+        user_table = str(os.environ['USERS_TABLE'])
+        table = db_client.Table(user_table)
+
+        reporter_response = table.get_item(Key={
+            'userId': incident_response['Item']['reporterId']
+        })
+
+        developer_response = table.get_item(Key={
+            'userId': incident_response['Item']['developerId']
         })
 
     except ClientError as err:
@@ -536,7 +548,21 @@ def get_incidents(event, context):
 
         return build_resp(body=err.response['Error']['Message'], status_code=err.response['Error']['Code'])
     else:
-        item = response['Item']
+        item = incident_response['Item']
+
+        item["developer"] = {
+            "name": developer_response['Item']["name"],
+            "userRole": developer_response['Item']["userRole"],
+            "summary": developer_response['Item']["summary"],
+            "userEmail": developer_response['Item']["userEmail"],
+        }
+        item["reporter"] = {
+            "name": reporter_response['Item']["name"],
+            "userRole": reporter_response['Item']["userRole"],
+            "summary": reporter_response['Item']["summary"],
+            "userEmail": reporter_response['Item']["userEmail"],
+        }
+
         return build_resp(body=item)
 
 
@@ -632,13 +658,11 @@ def create_incidents(event, context):
         current_date = datetime.now()
         iso_time_str = current_date.strftime('%Y-%m-%d %I:%M:%S %p')
 
+        event_body["timestamp"] = iso_time_str
+        event_body["incidentId"] = incident_id
+
         response = table.put_item(
-            Item={
-                "incidentId": incident_id,
-                "reporterId": event_body['reporterId'],
-                "developerId": event_body['developerId'],
-                "timestamp": iso_time_str
-            }
+            Item=event_body
         )
 
     except ClientError as err:

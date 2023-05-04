@@ -12,6 +12,11 @@ export default function AdminControl() {
   const { TextArea } = Input;
 
   useEffect(() => {
+    if (userData.userRole?.toLowerCase().trim() !== "admin") {
+      navigate("/error");
+      return;
+    }
+
     form.setFieldsValue({
       userId: "",
       summary: "",
@@ -19,10 +24,6 @@ export default function AdminControl() {
     });
     console.log(userData);
   }, []);
-
-  useEffect(() => {
-    console.log(form.getFieldsValue());
-  }, [form]);
 
   const searchUser = (values) => {
     if (values.userId !== roleChangeUserData.userId) {

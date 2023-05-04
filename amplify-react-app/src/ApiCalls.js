@@ -89,6 +89,30 @@ export const updatePermissions = async (values) => {
   return response;
 };
 
+export const updateIncidentComments = async (commentForm, incidentData) => {
+  const response = await client.patch(
+    `incident/update/${incidentData.incidentId}`,
+    {
+      incidentStatus: incidentData?.incidentStatus,
+      title: incidentData.title,
+      summary: incidentData.description,
+      taskType: incidentData.requestType,
+      complexityRating: incidentData.complexityRating,
+      subCategory: incidentData.subCategory,
+      reporterId: incidentData.reporterId,
+      developerId: incidentData.developerId,
+      comments: [
+        ...incidentData?.comments,
+        {
+          author: commentForm.getFieldValue("author"),
+          content: commentForm.getFieldValue("content"),
+        },
+      ],
+    }
+  );
+  return response;
+};
+
 export const createIncident = async (form) => {
   const { accessToken } = await fetchAuthSession();
   const { username } = accessToken.payload;
@@ -102,8 +126,24 @@ export const createIncident = async (form) => {
     subCategory: form.getFieldValue("subCategory"),
     reporterId: username,
     developerId: username,
-    // comments: [form.getFieldValue("comment")],
+    comments: [],
   });
 
-  return response.json();
+  return response;
+};
+
+export const updateIncident = async (form, comments, id) => {
+  const response = await client.patch(`incident/update/${id}`, {
+    incidentStatus: "New",
+    title: form.getFieldValue("title"),
+    summary: form.getFieldValue("description"),
+    taskType: form.getFieldValue("requestType"),
+    complexityRating: form.getFieldValue("complexityRating"),
+    subCategory: form.getFieldValue("subCategory"),
+    reporterId: form.getFieldValue("reporterId"),
+    developerId: form.getFieldValue("developerId"),
+    comments: comments,
+  });
+
+  return response;
 };

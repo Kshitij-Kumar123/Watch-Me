@@ -20,7 +20,7 @@ export const Navbar = ({ user, signOut, username }) => {
       key = "1";
     } else if (location.pathname === "/incident/user") {
       key = "2";
-    } else if (location.pathname === "/admin") {
+    } else if (location.pathname === "/user/admin") {
       key = "3";
     } else {
       key = "0";
@@ -30,6 +30,7 @@ export const Navbar = ({ user, signOut, username }) => {
   }, [location]);
 
   useEffect(() => {
+    console.log(userData);
     const navbar = [
       {
         key: "1",
@@ -41,7 +42,7 @@ export const Navbar = ({ user, signOut, username }) => {
       },
     ];
 
-    if (userData.role?.toLowerCase().trim() === "admin") {
+    if (userData.userRole?.toLowerCase().trim() === "admin") {
       navbar.push({
         key: "3",
         label: <Link to={"/user/admin"}>Admin</Link>,
