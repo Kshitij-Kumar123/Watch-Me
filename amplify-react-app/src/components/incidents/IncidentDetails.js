@@ -25,7 +25,9 @@ const { RangePicker } = DatePicker;
 
 export default function IncidentDetails() {
   const params = useParams();
+  const [formDisabled, setFormDisabled] = useState(true);
   const [incidentData, setIncidentData] = useState({});
+  const [comments, setComments] = useState([]);
   const { TextArea } = Input;
   const [form] = Form.useForm();
   const [commentForm] = Form.useForm();
@@ -33,6 +35,7 @@ export default function IncidentDetails() {
   console.log("user data: ", userData);
 
   useEffect(() => {
+    setFormDisabled(userData.userRole === "customer");
     commentForm.setFieldsValue({
       authorEmail: userData.userEmail,
       author: {
@@ -54,12 +57,35 @@ export default function IncidentDetails() {
 
   useEffect(() => {
     console.log("this is incident data: ", incidentData);
-    form.setFieldsValue(incidentData);
+    let a = [];
+
+    if (incidentData.comments) {
+      incidentData?.comments.map((value) => {
+        a.push({
+          author: value.author.email,
+          content: value.content,
+        });
+      });
+    }
+
+    setComments(a);
+    if (incidentData?.developer && incidentData?.reporter) {
+      form.setFieldsValue({
+        ...incidentData,
+        developerId: incidentData?.developer.userEmail ?? "",
+        reporterId: incidentData?.reporter.userEmail ?? "",
+      });
+    }
   }, [incidentData, form]);
 
   const addComment = async () => {
-    updateIncidentComments(commentForm, incidentData).then((response) => {
+    updateIncidentComments(
+      commentForm,
+      incidentData,
+      incidentData?.comments ?? []
+    ).then((response) => {
       console.log(response);
+      window.location.reload();
     });
   };
 
@@ -67,44 +93,11 @@ export default function IncidentDetails() {
     updateIncident(form, incidentData.comments, incidentData.incidentId).then(
       (response) => {
         console.log(response);
+        window.location.reload();
       }
     );
   };
 
-  const data = [
-    {
-      actions: [<span key="comment-list-reply-to-0">Reply to</span>],
-      author: "Han Solo",
-      content: (
-        <p>
-          We supply a series of design principles, practical patterns and high
-          quality design resources (Sketch and Axure), to help people create
-          their product prototypes beautifully and efficiently.
-        </p>
-      ),
-      datetime: (
-        <Tooltip title="2016-11-22 11:22:33">
-          <span>8 hours ago</span>
-        </Tooltip>
-      ),
-    },
-    {
-      actions: [<span key="comment-list-reply-to-0">Reply to</span>],
-      author: "Han Solo",
-      content: (
-        <p>
-          We supply a series of design principles, practical patterns and high
-          quality design resources (Sketch and Axure), to help people create
-          their product prototypes beautifully and efficiently.
-        </p>
-      ),
-      datetime: (
-        <Tooltip title="2016-11-22 10:22:33">
-          <span>9 hours ago</span>
-        </Tooltip>
-      ),
-    },
-  ];
   return (
     <div style={{ padding: 16 }}>
       <Row gutter={[16, 16]}>
@@ -123,19 +116,14 @@ export default function IncidentDetails() {
                   style={{ maxWidth: 600, padding: "16px 0px" }}
                   onFinish={updateIncidentForm}
                 >
-                  <Form.Item label="Request Type" name="requestType">
-                    <Input />
+                  <Form.Item label="Request Type" name="taskType">
+                    <Input disabled={true} />
                   </Form.Item>
                   <Form.Item label="Incident Title" name="title">
-                    <Input />
-                  </Form.Item>
-                  <Form.Item label="Status" name="status">
-                    <Select>
-                      <Select.Option value="status">Status</Select.Option>
-                    </Select>
+                    <Input disabled={true} />
                   </Form.Item>
                   <Form.Item label="Description" name="summary">
-                    <TextArea rows={5} />
+                    <TextArea rows={9} />
                   </Form.Item>
                 </Form>
               </Col>
@@ -148,27 +136,27 @@ export default function IncidentDetails() {
                   style={{ maxWidth: 600, padding: "16px 0px" }}
                 >
                   <Form.Item label="Sub Category" name="subCategory">
-                    <Select>
+                    <Select disabled={formDisabled}>
                       <Select.Option value="demo">Demo</Select.Option>
                     </Select>
                   </Form.Item>
                   <Form.Item label="Incident Status" name="incidentStatus">
-                    <Select>
+                    <Select disabled={formDisabled}>
                       <Select.Option value="demo">Demo</Select.Option>
                     </Select>
                   </Form.Item>
                   <Form.Item label="Developer" name="developerId">
-                    <Input />
+                    <Input disabled={formDisabled} />
                   </Form.Item>
                   <Form.Item label="Reporter" name="reporterId">
-                    <Input />
+                    <Input disabled={formDisabled} />
                   </Form.Item>
                   <Form.Item label="Created Timestamp" name="timestamp">
-                    <Input />
+                    <Input disabled={true} />
                   </Form.Item>
-                  <Form.Item label="Complexity" name="complexityRating">
+                  {/* <Form.Item label="Complexity" name="complexityRating">
                     <InputNumber />
-                  </Form.Item>
+                  </Form.Item> */}
                   <Form.Item>
                     <Button
                       type="primary"
@@ -186,17 +174,14 @@ export default function IncidentDetails() {
         <Col span={24}>
           {incidentData.comments && (
             <List
-              header={`${incidentData.comments.length} Comments`}
+              header={`${incidentData?.comments.length} Comments`}
               itemLayout="horizontal"
-              dataSource={incidentData.comments}
+              dataSource={comments}
               renderItem={(item) => (
                 <li>
                   <Comment
-                    actions={item.actions}
                     author={item.author}
-                    avatar={item.avatar ?? ""}
                     content={item.content}
-                    datetime={item.datetime}
                     style={{ padding: "0px 16px", margin: "16px 0px" }}
                   />
                 </li>

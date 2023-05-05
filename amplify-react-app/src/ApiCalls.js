@@ -89,20 +89,24 @@ export const updatePermissions = async (values) => {
   return response;
 };
 
-export const updateIncidentComments = async (commentForm, incidentData) => {
+export const updateIncidentComments = async (
+  commentForm,
+  incidentData,
+  comments
+) => {
   const response = await client.patch(
     `incident/update/${incidentData.incidentId}`,
     {
       incidentStatus: incidentData?.incidentStatus,
       title: incidentData.title,
-      summary: incidentData.description,
-      taskType: incidentData.requestType,
-      complexityRating: incidentData.complexityRating,
+      summary: incidentData.summary,
+      taskType: incidentData.taskType,
+      //   complexityRating: incidentData.complexityRating,
       subCategory: incidentData.subCategory,
       reporterId: incidentData.reporterId,
       developerId: incidentData.developerId,
       comments: [
-        ...incidentData?.comments,
+        ...comments,
         {
           author: commentForm.getFieldValue("author"),
           content: commentForm.getFieldValue("content"),
@@ -121,8 +125,8 @@ export const createIncident = async (form) => {
     incidentStatus: "New",
     title: form.getFieldValue("title"),
     summary: form.getFieldValue("description"),
-    taskType: form.getFieldValue("requestType"),
-    complexityRating: form.getFieldValue("complexityRating"),
+    taskType: form.getFieldValue("taskType"),
+    // complexityRating: String(form.getFieldValue("complexityRating")),
     subCategory: form.getFieldValue("subCategory"),
     reporterId: username,
     developerId: username,
@@ -136,9 +140,9 @@ export const updateIncident = async (form, comments, id) => {
   const response = await client.patch(`incident/update/${id}`, {
     incidentStatus: "New",
     title: form.getFieldValue("title"),
-    summary: form.getFieldValue("description"),
-    taskType: form.getFieldValue("requestType"),
-    complexityRating: form.getFieldValue("complexityRating"),
+    summary: form.getFieldValue("summary"),
+    taskType: form.getFieldValue("taskType"),
+    // complexityRating: String(form.getFieldValue("complexityRating")),
     subCategory: form.getFieldValue("subCategory"),
     reporterId: form.getFieldValue("reporterId"),
     developerId: form.getFieldValue("developerId"),
