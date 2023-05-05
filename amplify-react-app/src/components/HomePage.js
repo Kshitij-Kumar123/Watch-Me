@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import {
   Button,
@@ -7,10 +7,8 @@ import {
   Row,
   Typography,
   Modal,
-  DatePicker,
   Form,
   Input,
-  InputNumber,
   Select,
   Upload,
   notification,
@@ -18,7 +16,6 @@ import {
 import { createIncident } from "../ApiCalls";
 
 const { Title } = Typography;
-const { RangePicker } = DatePicker;
 const { TextArea } = Input;
 
 const normFile = (e) => {
@@ -37,24 +34,26 @@ const IncidentForm = ({ form }) => {
       form={form}
       style={{ maxWidth: 600, padding: "16px 0px" }}
     >
-      <Form.Item label="Incident Title" name="title">
+      <Form.Item
+        label="Incident Title"
+        name="title"
+        rules={[{ required: true, message: "Please input your title!" }]}
+      >
         <Input />
+      </Form.Item>
+      <Form.Item label="Type" name="taskType">
+        <Input disabled={true} />
       </Form.Item>
       <Form.Item label="Sub Category" name="subCategory">
         <Select>
           <Select.Option value="demo">Demo</Select.Option>
         </Select>
       </Form.Item>
-      <Form.Item label="RangePicker" name="dateRange">
-        <RangePicker />
-      </Form.Item>
-      <Form.Item label="Complexity" name="complexity">
-        <InputNumber />
-      </Form.Item>
-      <Form.Item label="Description" name="description">
-        <TextArea rows={4} />
-      </Form.Item>
-      <Form.Item label="Comments" name="comment">
+      <Form.Item
+        label="Description"
+        name="description"
+        rules={[{ required: true, message: "Please input your description!" }]}
+      >
         <TextArea rows={4} />
       </Form.Item>
       <Form.Item
@@ -75,10 +74,11 @@ const IncidentForm = ({ form }) => {
 };
 export default function HomePage({ user, signOut }) {
   const [open, setOpen] = useState(false);
+  const [requestType, setRequestType] = useState({});
   const [form] = Form.useForm();
 
   const submitRequests = async (requestType) => {
-    form.setFieldValue({ requestType: requestType });
+    form.setFieldValue({ taskType: requestType });
     createIncident(form).then(() => {
       setOpen(false);
       notification.info({
@@ -118,7 +118,10 @@ export default function HomePage({ user, signOut }) {
                 bordered={false}
                 actions={[
                   <Button
-                    onClick={() => setOpen(true)}
+                    onClick={() => {
+                      setRequestType(value);
+                      setOpen(true);
+                    }}
                     style={{ float: "right", marginRight: "8px" }}
                   >
                     Request
@@ -134,28 +137,21 @@ export default function HomePage({ user, signOut }) {
                 >
                   {value.description}
                 </div>
-                <Modal
-                  title={`Create Request: ${value.key}`}
-                  open={open}
-                  onOk={() => submitRequests(value.key)}
-                  onCancel={clearForm}
-                  okText="Create"
-                  cancelText="Cancel"
-                >
-                  <IncidentForm form={form} />
-                </Modal>
               </Card>
             </Col>
           );
         })}
       </Row>
-      {/* <Row style={{ margin: "16px 0px" }}>
-        <Col span={24}>
-          <Card title={"Something"} bordered={false}>
-            Hello this is some description
-          </Card>
-        </Col>
-      </Row> */}
+      <Modal
+        title={`Create Request: ${requestType.key}`}
+        open={open}
+        onOk={() => submitRequests(requestType.key)}
+        onCancel={clearForm}
+        okText="Create"
+        cancelText="Cancel"
+      >
+        <IncidentForm form={form} />
+      </Modal>
     </div>
   );
 }

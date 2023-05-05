@@ -72,8 +72,8 @@ export default function IncidentDetails() {
     if (incidentData?.developer && incidentData?.reporter) {
       form.setFieldsValue({
         ...incidentData,
-        developerId: incidentData?.developer.userEmail ?? "",
-        reporterId: incidentData?.reporter.userEmail ?? "",
+        developer: incidentData?.developer.userEmail ?? "",
+        reporter: incidentData?.reporter.userEmail ?? "",
       });
     }
   }, [incidentData, form]);
@@ -136,27 +136,35 @@ export default function IncidentDetails() {
                   style={{ maxWidth: 600, padding: "16px 0px" }}
                 >
                   <Form.Item label="Sub Category" name="subCategory">
-                    <Select disabled={formDisabled}>
+                    <Select disabled={true}>
                       <Select.Option value="demo">Demo</Select.Option>
                     </Select>
                   </Form.Item>
                   <Form.Item label="Incident Status" name="incidentStatus">
                     <Select disabled={formDisabled}>
-                      <Select.Option value="demo">Demo</Select.Option>
+                      <Select.Option value="New">New</Select.Option>
+                      <Select.Option value="Work In Progress">
+                        Work In Progress
+                      </Select.Option>
+                      <Select.Option value="Delayed">Delayed</Select.Option>
+                      <Select.Option value="Complete">Complete</Select.Option>
                     </Select>
                   </Form.Item>
-                  <Form.Item label="Developer" name="developerId">
+                  <Form.Item label="Developer Id" name="developerId">
                     <Input disabled={formDisabled} />
                   </Form.Item>
-                  <Form.Item label="Reporter" name="reporterId">
+                  <Form.Item label="Developer" name="developer">
                     <Input disabled={formDisabled} />
+                  </Form.Item>
+                  <Form.Item label="Reporter Id" name="reporterId">
+                    <Input disabled={true} />
+                  </Form.Item>
+                  <Form.Item label="Reporter" name="reporter">
+                    <Input disabled={true} />
                   </Form.Item>
                   <Form.Item label="Created Timestamp" name="timestamp">
                     <Input disabled={true} />
                   </Form.Item>
-                  {/* <Form.Item label="Complexity" name="complexityRating">
-                    <InputNumber />
-                  </Form.Item> */}
                   <Form.Item>
                     <Button
                       type="primary"

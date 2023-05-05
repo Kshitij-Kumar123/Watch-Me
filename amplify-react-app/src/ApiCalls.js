@@ -58,6 +58,13 @@ export const fetchUserIncidents = async () => {
   return response.data;
 };
 
+export const fetchAssignedIncidents = async () => {
+  const { accessToken } = await fetchAuthSession();
+  const { username } = accessToken.payload;
+  const response = await client.get(`/incident/developer/${username}`);
+  return response.data;
+};
+
 export const fetchCurrentUserDetails = async () => {
   const { accessToken } = await fetchAuthSession();
   const username = accessToken.payload.username;
@@ -146,6 +153,7 @@ export const updateIncident = async (form, comments, id) => {
     subCategory: form.getFieldValue("subCategory"),
     reporterId: form.getFieldValue("reporterId"),
     developerId: form.getFieldValue("developerId"),
+    incidentStatus: form.getFieldValue("incidentStatus"),
     comments: comments,
   });
 
