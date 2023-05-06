@@ -52,6 +52,11 @@ export const Navbar = ({ user, signOut, username }) => {
     setNavbarItems(navbar);
   }, []);
 
+  const handleSignOut = () => {
+    signOut();
+    window.location.reload();
+  };
+
   const items = [
     {
       key: "1",
@@ -60,7 +65,7 @@ export const Navbar = ({ user, signOut, username }) => {
     {
       key: "2",
       danger: true,
-      label: <div onClick={signOut}>Sign Out</div>,
+      label: <div onClick={handleSignOut}>Sign Out</div>,
     },
   ];
 

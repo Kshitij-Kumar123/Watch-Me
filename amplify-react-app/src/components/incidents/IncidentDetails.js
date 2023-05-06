@@ -5,23 +5,9 @@ import {
   updateIncident,
   updateIncidentComments,
 } from "../../ApiCalls";
-import {
-  Col,
-  Row,
-  Card,
-  Form,
-  Button,
-  Input,
-  InputNumber,
-  Select,
-  DatePicker,
-  List,
-  Tooltip,
-} from "antd";
+import { Col, Row, Card, Form, Button, Input, Select, List } from "antd";
 import { Comment } from "@ant-design/compatible";
 import { UserContext } from "../../context/UserContext";
-
-const { RangePicker } = DatePicker;
 
 export default function IncidentDetails() {
   const params = useParams();
@@ -32,9 +18,9 @@ export default function IncidentDetails() {
   const [form] = Form.useForm();
   const [commentForm] = Form.useForm();
   const { userData } = useContext(UserContext);
-  console.log("user data: ", userData);
 
   useEffect(() => {
+    console.log("user data: ", userData);
     setFormDisabled(userData.userRole === "customer");
     commentForm.setFieldsValue({
       authorEmail: userData.userEmail,
